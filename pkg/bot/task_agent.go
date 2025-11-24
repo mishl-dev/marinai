@@ -47,8 +47,8 @@ func (ta *TaskAgent) CheckTask(userMsg string) (bool, string) {
 	}
 
 	// If confidence is low, give benefit of doubt
-	// Only treat as a task if we're confident (score >= 0.6)
-	if score < 0.2 {
+	// Only treat as a task if we're confident (score >= 0.5)
+	if score < 0.5 {
 		log.Printf("Score too low, assuming chat message")
 		return false, ""
 	}
