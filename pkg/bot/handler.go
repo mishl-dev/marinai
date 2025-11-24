@@ -456,19 +456,62 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 }
 
 func (h *Handler) extractMemories(userId string, userName string, userMessage string, botReply string) {
-	// 1. Fetch existing facts
+	// ---------------------------------------------------------
+	// 1. Heuristic Filters (Save compute & reduce noise)
+	// ---------------------------------------------------------
+	cleanMsg := strings.TrimSpace(userMessage)
+
+	// Filter A: Length Check
+	// Ignore short, trivial messages like "Hi", "Thanks", "Ok", "Cool".
+	// Long-term facts usually require a sentence structure.
+	if len(cleanMsg) < 12 {
+		return
+	}
+
+	// Filter B: Keyword/Subject Check
+	// If the user isn't talking about themselves, we usually don't need to memorize it.
+	// This skips questions like "What is the weather?" or "Write code for X".
+	triggers := []string{
+		"i am", "i'm", "my", "mine", // Self-identification
+		"i live", "i work", "i study", // Life details
+		"i like", "i love", "i hate", "i prefer", // Preferences
+		"i have", "i've", // Possession/Experience
+		"don't like", "dislike", // Negative preferences
+		"name is", "call me", // Naming
+	}
+
+	hasTrigger := false
+	lowerMsg := strings.ToLower(cleanMsg)
+	for _, t := range triggers {
+		if strings.Contains(lowerMsg, t) {
+			hasTrigger = true
+			break
+		}
+	}
+
+	// If no self-reference keywords are found, abort.
+	if !hasTrigger {
+		return
+	}
+
+	// ---------------------------------------------------------
+	// 2. Fetch Existing Facts
+	// ---------------------------------------------------------
 	existingFacts, err := h.memoryStore.GetFacts(userId)
 	if err != nil {
 		log.Printf("Error fetching facts for extraction: %v", err)
 		return
 	}
 
-	// 2. Construct Prompt for Extraction
+	// ---------------------------------------------------------
+	// 3. Construct Prompts (Strict & Conservative)
+	// ---------------------------------------------------------
 	currentProfile := "None"
 	if len(existingFacts) > 0 {
 		currentProfile = "- " + strings.Join(existingFacts, "\n- ")
 	}
 
+	// User Prompt: Focuses on specific logical constraints
 	extractionPrompt := fmt.Sprintf(`Current Profile:
 %s
 
@@ -476,36 +519,56 @@ New Interaction:
 %s: "%s"
 Marin: "%s"
 
-Task: Analyze the interaction and update the user's profile.
-- Extract ONLY permanent, explicit facts about the user (e.g., name, job, location, strong preferences).
-- Ignore opinions, temporary states, and trivial details.
-- If the user contradicts a previous fact (e.g., moved cities), REMOVE the old fact and ADD the new one.
-- Return a JSON object with "add" (list of strings) and "remove" (list of strings).
-- If no changes, return empty lists.
+Task: Analyze the interaction and output a JSON object with "add" and "remove" lists.
 
-Output JSON:`, currentProfile, userName, userMessage, botReply)
+STRICT RULES FOR MEMORY:
+1. CONSERVATIVE: Bias towards returning empty lists. Only act if the information is explicitly stated and permanent.
+2. PERMANENT ONLY: Save facts like Name, Job, Location, Allergies, Relationships.
+3. IGNORE TEMPORARY: Do NOT save states like "I am hungry", "I am tired", "I am driving", or "I am busy".
+4. IGNORE TRIVIAL: Do NOT save weak preferences or small talk (e.g., "I like that joke").
+5. CONTRADICTIONS: If the user explicitly contradicts an item in 'Current Profile' (e.g., moved to a new city), add the new fact to 'add' and the old fact to 'remove'.
+
+Output ONLY valid JSON.`, currentProfile, userName, userMessage, botReply)
 
 	messages := []cerebras.Message{
-		{Role: "system", Content: "You are a memory manager. Output ONLY JSON."},
-		{Role: "user", Content: extractionPrompt},
+		{
+			Role: "system",
+			// System Prompt: Sets the persona to be strict and lazy (avoids false positives)
+			Content: `You are a strict Database Administrator responsible for long-term user records. 
+Your goal is to keep the database clean and concise. 
+Reject all trivial information. 
+Reject all temporary states (moods, current activities). 
+Only record hard facts that will remain true for months. 
+Output ONLY valid JSON.`,
+		},
+		{
+			Role:    "user",
+			Content: extractionPrompt,
+		},
 	}
 
-	// 3. Call LLM
+	// ---------------------------------------------------------
+	// 4. Call LLM
+	// ---------------------------------------------------------
 	resp, err := h.cerebrasClient.ChatCompletion(messages)
 	if err != nil {
 		log.Printf("Error extracting memories: %v", err)
 		return
 	}
 
-	// 4. Parse JSON
-	// Clean up response (sometimes LLMs add markdown code blocks)
+	// ---------------------------------------------------------
+	// 5. Parse JSON
+	// ---------------------------------------------------------
 	jsonStr := strings.TrimSpace(resp)
-	if strings.HasPrefix(jsonStr, "```json") {
-		jsonStr = strings.TrimPrefix(jsonStr, "```json")
-		jsonStr = strings.TrimSuffix(jsonStr, "```")
-	} else if strings.HasPrefix(jsonStr, "```") {
-		jsonStr = strings.TrimPrefix(jsonStr, "```")
-		jsonStr = strings.TrimSuffix(jsonStr, "```")
+	
+	// Robust markdown stripping
+	if strings.HasPrefix(jsonStr, "```") {
+		lines := strings.Split(jsonStr, "\n")
+		if len(lines) >= 2 {
+			// If it starts with ```json or ```, strip the first and last lines
+			// We reconstruct the middle lines
+			jsonStr = strings.Join(lines[1:len(lines)-1], "\n")
+		}
 	}
 	jsonStr = strings.TrimSpace(jsonStr)
 
@@ -516,11 +579,14 @@ Output JSON:`, currentProfile, userName, userMessage, botReply)
 
 	var delta Delta
 	if err := json.Unmarshal([]byte(jsonStr), &delta); err != nil {
-		log.Printf("Error parsing memory delta JSON: %v. Response: %s", err, resp)
+		// If unmarshal fails, it usually means the LLM replied with text saying "No changes".
+		// We can safely ignore this.
 		return
 	}
 
-	// 5. Apply Delta
+	// ---------------------------------------------------------
+	// 6. Apply Delta
+	// ---------------------------------------------------------
 	if len(delta.Add) > 0 || len(delta.Remove) > 0 {
 		log.Printf("Applying memory delta for user %s: +%v, -%v", userId, delta.Add, delta.Remove)
 		if err := h.memoryStore.ApplyDelta(userId, delta.Add, delta.Remove); err != nil {
