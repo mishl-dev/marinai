@@ -1,0 +1,20 @@
+services:
+  marinai:
+    build: .
+    container_name: marinai
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY}
+      - EMBEDDING_API_URL=${EMBEDDING_API_URL}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
+      - HF_API_KEY=${HF_API_KEY}
+      - SURREAL_DB_HOST=${SURREAL_DB_HOST}
+      - SURREAL_DB_USER=${SURREAL_DB_USER}
+      - SURREAL_DB_PASS=${SURREAL_DB_PASS}
+      - SURREAL_DB_NAMESPACE=${SURREAL_DB_NAMESPACE:-marin}
+      - SURREAL_DB_DATABASE=${SURREAL_DB_DATABASE:-memory}
+    volumes:
+      - ./config.yml:/app/config.yml

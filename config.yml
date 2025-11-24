@@ -1,0 +1,9 @@
+model_settings:
+  temperature: 1
+  top_p: 1
+delays:
+  message_processing: 1.5
+memory:
+  fact_aging_days: 7
+  fact_summarization_threshold: 20
+  maintenance_interval_hours: 24

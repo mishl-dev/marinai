@@ -1,0 +1,102 @@
+name: Auto Release & Build
+
+on:
+  # 1. Runs automatically on push to master
+  push:
+    branches:
+      - master
+  # 2. Adds the "Run workflow" button in Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Run tests
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          EMBEDDING_API_URL: ${{ secrets.EMBEDDING_API_URL }}
+          EMBEDDING_API_KEY: ${{ secrets.EMBEDDING_API_KEY }}
+          SURREAL_DB_HOST: ${{ secrets.SURREAL_DB_HOST }}
+          SURREAL_DB_USER: ${{ secrets.SURREAL_DB_USER }}
+          SURREAL_DB_PASS: ${{ secrets.SURREAL_DB_PASS }}
+        run: go test -v ./...
+
+  release:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: '0' # Essential for version history calculation
+
+      # --- 1. Versioning ---
+      - name: Generate Next Version
+        id: tag_version
+        uses: anothrNick/github-tag-action@1.70.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          DEFAULT_BUMP: patch
+
+      # --- 2. Build Binary (Go 1.24) ---
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build Binary
+        run: |
+          go mod download
+          CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o marinai ./main.go
+
+      # --- 3. Build & Push Docker ---
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase Repo Name
+        run: |
+          echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ env.IMAGE_NAME }}:latest
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.tag_version.outputs.new_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- 4. GitHub Release ---
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          files: marinai
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
