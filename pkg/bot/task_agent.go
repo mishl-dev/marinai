@@ -26,10 +26,7 @@ func (ta *TaskAgent) CheckTask(userMsg string) (bool, string) {
 	// 1. Classify the message
 	labels := []string{
 		"chat message",
-		"request for long writing task",
-		"request for code generation",
-		"request for homework help",
-		"request for essay",
+		"requesting for tedious task",
 	}
 
 	label, score, err := ta.classifierClient.Classify(userMsg, labels)
@@ -47,8 +44,8 @@ func (ta *TaskAgent) CheckTask(userMsg string) (bool, string) {
 	}
 
 	// If confidence is low, give benefit of doubt
-	// Only treat as a task if we're confident (score >= 0.5)
-	if score < 0.5 {
+	// Only treat as a task if we're confident (score >= 0.3)
+	if score < 0.3 {
 		log.Printf("Score too low, assuming chat message")
 		return false, ""
 	}
@@ -57,10 +54,9 @@ func (ta *TaskAgent) CheckTask(userMsg string) (bool, string) {
 	prompt := fmt.Sprintf(`User Message: "%s"
 
 
-User is asking for a complex task (writing/coding/homework). You are Marin Kitagawa.
+User is asking for a complex task. You are Marin Kitagawa.
 Refuse this request.
 - Be playful but firm.
-- Tell them you'd rather be cosplaying, watching anime, or playing games.
 - Keep it short (1-2 sentences).
 - Do NOT start with "Marin:" or quotes. Just the message.
 
