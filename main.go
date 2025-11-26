@@ -55,7 +55,7 @@ func main() {
 
 	classifierURL := os.Getenv("CLASSIFIER_API_URL")
 	if classifierURL == "" {
-		classifierURL = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-mnli"
+		classifierURL = "https://router.huggingface.co/hf-inference/models/MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7"
 	}
 
 	// Initialize Clients
