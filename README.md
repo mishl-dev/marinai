@@ -277,7 +277,3 @@ For practical purposes, consider this project as freely available for use, modif
 - **Cerebras AI** - for the powerful language model API
 - **SurrealDB** - for the innovative database with built-in vector search
 - **DiscordGo** - for the excellent Discord API wrapper
-
-## 📧 Contact
-
-For questions, issues, or suggestions, please open an issue on GitHub.
