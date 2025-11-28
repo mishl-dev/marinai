@@ -142,4 +142,26 @@ func TestCachedClassifier_Classify(t *testing.T) {
 
 		mockClassifier.AssertExpectations(t)
 	})
+
+	t.Run("Different Labels", func(t *testing.T) {
+		mockClassifier := new(MockCachedClassifier)
+		cachedClassifier := NewCachedClassifier(mockClassifier, 10, "test-model")
+
+		text := "ambiguous text"
+		labelsA := []string{"LabelA1", "LabelA2"}
+		labelsB := []string{"LabelB1", "LabelB2"}
+
+		// 1. First call with Labels A
+		mockClassifier.On("Classify", text, labelsA).Return("LabelA1", 0.9, nil).Once()
+		label, _, _ := cachedClassifier.Classify(text, labelsA)
+		assert.Equal(t, "LabelA1", label)
+
+		// 2. Second call with Labels B
+		// Should be a CACHE MISS because labels are different
+		mockClassifier.On("Classify", text, labelsB).Return("LabelB1", 0.8, nil).Once()
+		label2, _, _ := cachedClassifier.Classify(text, labelsB)
+		assert.Equal(t, "LabelB1", label2)
+
+		mockClassifier.AssertExpectations(t)
+	})
 }

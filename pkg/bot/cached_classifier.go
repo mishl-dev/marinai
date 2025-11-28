@@ -36,11 +36,15 @@ func NewCachedClassifier(classifier Classifier, cacheSize int, model string) *Ca
 }
 
 func (c *CachedClassifier) Classify(text string, labels []string) (string, float64, error) {
-	// Create a cache key based on text and model
-	// We hash the text to keep keys short
-	hash := md5.Sum([]byte(text))
-	textHash := hex.EncodeToString(hash[:])
-	key := fmt.Sprintf("%s:%s", c.model, textHash)
+	// Create a cache key based on text, model, AND labels
+	// We hash the text and labels to keep keys short
+	h := md5.New()
+	h.Write([]byte(text))
+	for _, label := range labels {
+		h.Write([]byte(label))
+	}
+	keyHash := hex.EncodeToString(h.Sum(nil))
+	key := fmt.Sprintf("%s:%s", c.model, keyHash)
 
 	// Check cache
 	if result, ok := c.cache.Get(key); ok {

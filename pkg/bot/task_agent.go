@@ -38,15 +38,10 @@ func (ta *TaskAgent) CheckTask(userMsg string) (bool, string) {
 
 	log.Printf("Task Classification: '%s' (score: %.2f)", label, score)
 
-	// If it's just a chat message, we're good
-	if label == "chat message" {
-		return false, ""
-	}
-
-	// If confidence is low, give benefit of doubt
-	// Only treat as a task if we're confident (score >= 0.3)
-	if score < 0.6 {
-		log.Printf("Score too low, assuming chat message")
+	// Only refuse if it is explicitly a task request with high confidence
+	if label == "requesting for tedious task" && score >= 0.6 {
+		log.Printf("Detected tedious task (score: %.2f), generating refusal", score)
+	} else {
 		return false, ""
 	}
 	// 2. Generate Refusal
