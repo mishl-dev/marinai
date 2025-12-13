@@ -350,7 +350,7 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 
 	if !shouldReply {
 		// Check for proactive reactions even if not replying
-		h.evaluateReaction(s, m.ChannelID, m.ID, m.Content)
+		go h.evaluateReaction(s, m.ChannelID, m.ID, m.Content)
 		return
 	}
 
@@ -539,6 +539,11 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 		// Add to Rolling Context
 		h.addRecentMessage(m.Author.ID, "user", m.Content)
 		h.addRecentMessage(m.Author.ID, "assistant", reply)
+
+		// Ensure User Profile Exists (for Loneliness/Agency features)
+		if err := h.memoryStore.EnsureUser(m.Author.ID); err != nil {
+			log.Printf("Error ensuring user profile exists: %v", err)
+		}
 
 		// Background Memory Extraction
 		h.extractMemories(m.Author.ID, displayName, m.Content, reply)
