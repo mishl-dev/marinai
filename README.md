@@ -1,279 +1,280 @@
-# MarinAI 🎀
+# 🎀 Marin AI
 
-A Discord bot powered by AI that embodies the personality of Marin Kitagawa from "My Dress-Up Darling". MarinAI features advanced memory capabilities using SurrealDB for vector search and long-term memory retention.
+> *A Discord companion bot that never forgets you*
 
-[![License: Curse of Knowledge](https://img.shields.io/badge/License-Curse%20of%20Knowledge-red.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.24.5-00ADD8?logo=go)](https://go.dev/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/)
-[![Go Test](https://github.com/mishl-dev/marinai/actions/workflows/test.yml/badge.svg)](https://github.com/mishl-dev/marinai/actions/workflows/test.yml)
-1. **User Profile Facts** (recent, structured information)
-2. **Vector Memories** (historical context via semantic search)
-3. **Context Assembly** → Combines Profile, Memories, and Rolling Context
-4. **LLM Response** → Generates response using Cerebras AI
-5. **Background Extraction** → Asynchronously analyzes interaction to update User Profile
-6. **Storage** → Updates Profile with timestamped facts in SurrealDB
+Marin is an AI-powered Discord bot featuring **long-term memory**, **semantic search**, and a unique personality inspired by Marin Kitagawa. She remembers your conversations, learns facts about you, and even reaches out when she's feeling lonely.
 
-### Tiered Memory System
+![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat-square&logo=go)
+![License](https://img.shields.io/badge/License-Curse%20of%20Knowledge-maroon?style=flat-square)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)
 
-**Active Facts** (0-7 days)
-- Stored in `user_profiles` table as structured data
-- Quick access for recent, relevant information
-- Each fact tracked with creation timestamp
+---
 
-**Aged Facts** (7+ days)
-- Automatically moved to `memories` table with vector embeddings
-- Searchable via semantic similarity
-- Preserves historical context without bloating profiles
+## ✨ Features
 
-**Summarization** (20+ facts)
-- LLM consolidates related facts when threshold exceeded
-- Reduces redundancy while preserving unique information
-- Keeps profiles concise and relevant
+### 🧠 Intelligent Memory System
+- **Semantic Vector Memory** — Stores conversation embeddings for context-aware recall
+- **User Profile Facts** — Automatically extracts and maintains persistent facts about users (name, preferences, location, etc.)
+- **Smart Deduplication** — Prevents storing redundant information using cosine similarity
+- **Memory Maintenance** — Periodic cleanup and summarization of aging facts
 
-**Daily Maintenance**
-- Background job runs every 24 hours
-- Archives old facts to vector storage
-- Triggers summarization when needed
+### 💬 Natural Conversations
+- **Multi-Model Failover** — Seamlessly switches between Cerebras-hosted models (Llama 3.3 70B, Qwen 3 235B, etc.) on API failures
+- **Discord-Native Style** — Casual texting style with custom emoji support
+- **Mood-Aware Reactions** — Uses zero-shot classification to add contextual emoji reactions
+- **Message Chunking** — Handles Discord's 2000 character limit gracefully
 
-## 📋 Prerequisites
+### ⏰ Proactive Behaviors
+- **Loneliness System** — Sends DMs to inactive users (Duolingo-style, won't spam if unanswered)
+- **Reminders** — Extracts and schedules event reminders from conversations
+- **Typing Indicators** — Natural typing simulation with configurable delays
 
-- **Go 1.24.5** or higher
-- **SurrealDB** instance ([local or hosted](https://surrealdb.com/install))
-- **Discord Bot Token** ([Create one here](https://discord.com/developers/applications))
-- **Cerebras API Key** ([Get one here](https://cerebras.ai/))
-- **Embedding API ([mishl-dev/text-embed-api](https://github.com/mishl-dev/text-embed-api))** ([hosted](https://github.com/mishl-dev/text-embed-api/))
-- **HUGGGINGFACE API KEY** ([Create one here](https://huggingface.co/settings/tokens/new))
+### 🛡️ Privacy & Control
+- **`/reset` Command** — Users can permanently delete all their data
+- **Per-User Isolation** — Each user's memories are stored separately
+- **No Third-Party Data Sharing** — All data stays in your SurrealDB instance
 
-## 🚀 Quick Start
+---
 
-### 1. Clone the Repository
+## 🏗️ Architecture
 
-```bash
-git clone https://github.com/mishl-dev/marinai.git
-cd marinai
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Discord Gateway                         │
+└─────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                          Bot Handler                            │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │  Message    │  │  Slash      │  │   Background Tasks      │  │
+│  │  Handler    │  │  Commands   │  │  • Loneliness Check     │  │
+│  │             │  │  • /reset   │  │  • Reminder Polling     │  │
+│  └─────────────┘  └─────────────┘  │  • Memory Maintenance   │  │
+│                                    └─────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+        │                     │                      │
+        ▼                     ▼                      ▼
+┌───────────────┐  ┌─────────────────┐  ┌─────────────────────────┐
+│   Cerebras    │  │   Embedding     │  │      Classifier         │
+│   LLM API     │  │   API           │  │   (HuggingFace NLI)     │
+│               │  │                 │  │                         │
+│ • llama-3.3   │  │ Vector          │  │  Zero-shot mood/        │
+│ • qwen-3-235b │  │ generation      │  │  intent classification  │
+│ • + fallbacks │  │ for semantic    │  │  for emoji reactions    │
+└───────────────┘  │ search          │  └─────────────────────────┘
+                   └─────────────────┘
+                            │
+                            ▼
+              ┌─────────────────────────────┐
+              │        SurrealDB            │
+              │                             │
+              │  • User profiles & facts    │
+              │  • Vector memories          │
+              │  • Recent message cache     │
+              │  • Reminders                │
+              │  • Emoji cache              │
+              │  • Pending DM tracking      │
+              └─────────────────────────────┘
 ```
 
-### 2. Set Up Environment Variables
+---
 
-Copy the example environment file and fill in your credentials:
-
-```bash
-cp example.env .env
-```
-
-Edit `.env` with your actual values:
-
-```env
-DISCORD_TOKEN=your_discord_bot_token
-CEREBRAS_API_KEY=your_cerebras_api_key
-EMBEDDING_API_URL=https://your-embedding-api.com/embed
-EMBEDDING_API_KEY=your_embedding_api_key
-SURREAL_DB_HOST=your-surrealdb-host.com
-SURREAL_DB_USER=your_surrealdb_username
-SURREAL_DB_PASS=your_surrealdb_password
-HF_API_KEY=your_huggingface_api_key
-```
-
-### 3. Install Dependencies
-
-```bash
-go mod download
-```
-
-### 4. Run the Bot
-
-```bash
-go run main.go
-```
-
-## 🐳 Docker Deployment
-
-### Using Docker Compose (Recommended)
-
-The easiest way to run MarinAI with all dependencies:
-
-1. **Set up environment variables**:
-   ```bash
-   cp example.env .env
-   # Edit .env with your credentials
-   ```
-
-2. **Start the services**:
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **View logs**:
-   ```bash
-   docker-compose logs -f marinai
-   ```
-
-4. **Stop the services**:
-   ```bash
-   docker-compose down
-   ```
-
-### Using Docker Only
-
-If you already have a SurrealDB instance:
-
-1. **Build the image**:
-   ```bash
-   docker build -t mrainai:latest .
-   ```
-
-2. **Run the container**:
-   ```bash
-   docker run -d \
-     --name marinai \
-     --env-file .env \
-     -v $(pwd)/storage:/app/storage \
-     marinai:latest
-   ```
-
-### Docker Configuration
-
-The `docker-compose.yml` includes:
-- **SurrealDB**: Automatically configured and networked
-- **Health Checks**: Ensures services start in the correct order
-- **Persistent Storage**: Data persists across container restarts
-- **Log Rotation**: Prevents log files from growing indefinitely
-- **Automatic Restart**: Services restart unless manually stopped
-
-To use an external SurrealDB instance, modify the `SURREAL_DB_HOST` in your `.env` file and remove the `surrealdb` service from `docker-compose.yml`.
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable | Required | Description | Default |
-|----------|----------|-------------|---------|
-| `DISCORD_TOKEN` | ✅ | Discord bot token | - |
-| `CEREBRAS_API_KEY` | ✅ | Cerebras AI API key | - |
-| `EMBEDDING_API_KEY` | ✅ | API key for embedding service | - |
-| `EMBEDDING_API_URL` | ❌ | Embedding API endpoint | `https://vector.mishl.dev/embed` |
-| `SURREAL_DB_HOST` | ✅ | SurrealDB host (WebSocket) | - |
-| `SURREAL_DB_USER` | ✅ | SurrealDB username | - |
-| `SURREAL_DB_PASS` | ✅ | SurrealDB password | - |
-
-### config.yml
-
-Create a `config.yml` file to customize bot behavior:
-
-```yaml
-model_settings:
-  temperature: 1
-  top_p: 1
-
-delays:
-  message_processing: 1.5
-
-memory:
-  fact_aging_days: 7                    # Days before facts age to vector storage
-  fact_summarization_threshold: 20      # Max facts before LLM summarization
-  maintenance_interval_hours: 24        # How often to run memory maintenance
-```
-
-### SurrealDB Setup
-
-MarinAI uses SurrealDB with the following configuration:
-- **Namespace**: `marin`
-- **Database**: `memory`
-- **Tables**: 
-  - `memories` (Vector Store for semantic search)
-  - `user_profiles` (Structured facts with timestamps)
-  - `recent_messages` (Rolling chat context)
-  - `guild_cache` (Server-specific emoji cache)
-
-The bot automatically creates the necessary schema on first run.
-
-## 🎮 Usage
-
-### Slash Commands
-
-- `/memory` - View your current memory statistics and manage stored memories
-- `/resent` - Resend the last bot response (useful if a message was deleted)
-
-### Interacting with the Bot
-
-Simply mention the bot or send it a direct message! MarinAI will:
-- Always respond in DMs
-- Respond when mentioned in servers
-- Remember important conversations
-- Use context from previous interactions
-
-## 🏗️ Project Structure
+## 📦 Project Structure
 
 ```
 marinai/
-├── main.go                 # Application entry point
+├── main.go                 # Application entrypoint
+├── config.yml              # Runtime configuration
 ├── pkg/
-│   ├── bot/               # Discord bot handlers and commands
-│   ├── cerebras/          # Cerebras AI client
-│   ├── embedding/         # Embedding API client
-│   ├── memory/            # Memory management and storage
-│   └── surreal/           # SurrealDB client wrapper
-├── storage/               # Local storage directory
-├── .env                   # Environment variables (not in git)
-├── example.env            # Example environment configuration
-└── go.mod                 # Go module dependencies
+│   ├── bot/                # Discord bot logic
+│   │   ├── handler.go          # Main message handler
+│   │   ├── system_prompt.go    # Marin's personality prompt
+│   │   ├── memory_processing.go# Fact extraction from conversations
+│   │   ├── loneliness.go       # Proactive DM system
+│   │   ├── slash_commands.go   # Discord slash commands
+│   │   ├── reactions.go        # Emoji reaction logic
+│   │   ├── reminders.go        # Reminder polling
+│   │   └── ...
+│   ├── cerebras/           # Cerebras API client with model failover
+│   ├── classifier/         # HuggingFace zero-shot classifier
+│   ├── embedding/          # Text embedding API client
+│   ├── memory/             # Memory store interface & implementations
+│   │   ├── store.go            # Store interface definition
+│   │   ├── surreal_store.go    # SurrealDB implementation
+│   │   └── memory_management.go# Cleanup & summarization
+│   ├── surreal/            # SurrealDB WebSocket client
+│   └── config/             # YAML config loading
+├── .github/workflows/      # CI/CD (tests & releases)
+├── Dockerfile              # Multi-stage production build
+└── docker-compose.yml      # Container orchestration
 ```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Go 1.24+** (or Docker)
+- **SurrealDB** instance (local or cloud)
+- API keys for:
+  - Discord Bot Token
+  - Cerebras API
+  - Embedding API (e.g., your own or a service)
+  - HuggingFace API (for classifier)
+
+### Configuration
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/marinai.git
+   cd marinai
+   ```
+
+2. **Create environment file**
+   ```bash
+   cp example.env .env
+   ```
+
+3. **Fill in your secrets** in `.env`:
+   ```env
+   DISCORD_TOKEN=your_discord_bot_token
+   CEREBRAS_API_KEY=your_cerebras_key
+   EMBEDDING_API_KEY=your_embedding_key
+   EMBEDDING_API_URL=https://your-embedding-endpoint/embed
+   HF_API_KEY=your_huggingface_key
+   SURREAL_DB_HOST=your-surrealdb-host.com
+   SURREAL_DB_USER=root
+   SURREAL_DB_PASS=your_password
+   SURREAL_DB_NAMESPACE=marin    # optional, defaults to 'marin'
+   SURREAL_DB_DATABASE=memory    # optional, defaults to 'memory'
+   ```
+
+4. **Adjust `config.yml`** if needed:
+   ```yaml
+   model_settings:
+     temperature: 1
+     top_p: 1
+   delays:
+     message_processing: 1.5  # seconds of typing simulation
+   memory:
+     fact_aging_days: 7
+     fact_summarization_threshold: 20
+     maintenance_interval_hours: 24
+   ```
+
+### Running Locally
+
+```bash
+# Install dependencies
+go mod download
+
+# Run the bot
+go run main.go
+```
+
+### Running with Docker
+
+```bash
+# Build and start
+docker compose up -d
+
+# View logs
+docker compose logs -f marinai
+```
+
+---
 
 ## 🧪 Testing
 
-Run the test suite:
-
 ```bash
+# Run all tests
 go test ./...
-```
 
-Run tests with verbose output:
-
-```bash
-go test -v ./...
-```
-
-Run tests with coverage:
-
-```bash
+# Run with coverage
 go test -cover ./...
+
+# Run specific package tests
+go test ./pkg/memory/...
+go test ./pkg/bot/...
 ```
 
-## 🔨 Building
+---
 
-Build the executable:
+## 📡 API Integrations
 
-```bash
-go build -o marinai
+| Service | Purpose | Fallback |
+|---------|---------|----------|
+| **Cerebras** | LLM chat completions | Auto-cycles through 6 models |
+| **Embedding API** | Text → vector embeddings | Configurable endpoint |
+| **HuggingFace** | Zero-shot classification | Cached per-message |
+| **SurrealDB** | Persistent storage | Required (no fallback) |
+
+### Cerebras Model Priority
+
+The bot automatically tries models in this order:
+1. `llama-3.3-70b` (64k context)
+2. `zai-glm-4.6` (64k context)
+3. `llama3.1-8b` (8k context)
+4. `qwen-3-235b-a22b-instruct-2507` (64k context)
+5. `qwen-3-32b` (64k context)
+6. `gpt-oss-120b` (64k context)
+
+---
+
+## 🎮 Discord Commands
+
+| Command | Description |
+|---------|-------------|
+| `/reset` | Permanently delete all your conversation history and memories |
+
+---
+
+## 🔧 How Memory Works
+
+1. **Conversation happens** → Message stored in recent messages cache
+2. **Heuristic filter** → Checks for self-referential keywords ("I am", "my name", etc.)
+3. **LLM analysis** → Extracts facts and checks for contradictions with existing profile
+4. **Delta application** → Adds new facts, removes contradicted ones
+5. **Embedding generation** → Stores vector for semantic search
+6. **Semantic retrieval** → On future queries, finds relevant past context
+
+### Example Flow
+
+```
+User: "I just moved to Tokyo for my new job at Sony!"
+
+→ Heuristic triggers: "I", "my"
+→ LLM extracts: { add: ["Lives in Tokyo", "Works at Sony"], remove: ["Lives in Seattle"] }
+→ Profile updated
+→ Next conversation: "How's Japan treating you?" uses Tokyo context
 ```
 
-For production builds with optimizations:
-
-```bash
-go build -ldflags="-s -w" -o marinai
-```
+---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+Contributions are welcome! Please ensure:
+- Tests pass: `go test ./...`
+- Code is formatted: `go fmt ./...`
+- No new linting issues: `go vet ./...`
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+---
 
-## 📝 License
+## 📜 License
 
-This project is licensed under **The Curse of Knowledge License v1.0** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under **The Curse of Knowledge License v1.0**.
 
-**⚠️ WARNING**: This is a paradoxical license. By reading the license text, you forfeit all rights granted by it. The license is essentially a humorous take on public domain dedication with a self-referential twist. If you haven't read the license yet, you have unlimited rights to use this work. If you have read it... well, it's too late now! 
+> By reading any portion of this license, you have already violated its primary condition.
 
-For practical purposes, consider this project as freely available for use, modification, and distribution. The license is meant to be entertaining rather than legally restrictive.
+See [LICENSE](LICENSE) for the full (self-referential) text.
+
+---
 
 ## 🙏 Acknowledgments
 
-- **My Dress-Up Darling** by Shinichi Fukuda - for the amazing character
-- **Cerebras AI** - for the powerful language model API
-- **SurrealDB** - for the innovative database with built-in vector search
-- **DiscordGo** - for the excellent Discord API wrapper
+- Built with [discordgo](https://github.com/bwmarrin/discordgo)
+- Powered by [Cerebras](https://cerebras.ai/) for lightning-fast inference
+- Data stored in [SurrealDB](https://surrealdb.com/)
+- Inspired by [My Dress-Up Darling](https://en.wikipedia.org/wiki/My_Dress-Up_Darling)
