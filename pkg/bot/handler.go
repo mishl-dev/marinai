@@ -590,6 +590,8 @@ func (h *Handler) extractMemories(userId string, userName string, userMessage st
 		return
 	}
 
+	log.Printf("Analyzing for memories: %s", cleanMsg)
+
 	// ---------------------------------------------------------
 	// 2. Fetch Existing Facts
 	// ---------------------------------------------------------
@@ -693,10 +695,11 @@ Output ONLY valid JSON.`,
 
 	var delta Delta
 	if err := json.Unmarshal([]byte(jsonStr), &delta); err != nil {
-		// If unmarshal fails, it usually means the LLM replied with text saying "No changes".
-		// We can safely ignore this.
+		log.Printf("[Memory Extraction] Failed to parse JSON: %v. Raw output: %s", err, jsonStr)
 		return
 	}
+
+	log.Printf("[Memory Extraction] Delta: %+v", delta)
 
 	// ---------------------------------------------------------
 	// 6. Apply Delta
