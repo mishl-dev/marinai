@@ -74,6 +74,13 @@ func (c *Client) Query(sql string, vars interface{}) (interface{}, error) {
 				if resField.IsValid() {
 					return resField.Interface(), nil
 				}
+			} else if lastElem.Kind() == reflect.Map {
+				// Handle map (e.g. from interface{} unmarshal)
+				// Look for "result" key
+				resVal := lastElem.MapIndex(reflect.ValueOf("result"))
+				if resVal.IsValid() {
+					return resVal.Interface(), nil
+				}
 			}
 		}
 	}
