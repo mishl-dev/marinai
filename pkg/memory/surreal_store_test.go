@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // setupSurrealTest handles the common setup logic for SurrealDB tests.
@@ -75,35 +77,17 @@ func TestSurrealStore_ApplyDelta(t *testing.T) {
 		removes := []string{}
 
 		err := store.ApplyDelta(testUserID, adds, removes)
-		if err != nil {
-			t.Fatalf("Failed to apply delta (add): %v", err)
-		}
+		require.NoError(t, err, "Failed to apply delta (add)")
 
 		// Verify facts were added
 		facts, err := store.GetFacts(testUserID)
-		if err != nil {
-			t.Fatalf("Failed to get facts: %v", err)
-		}
+		require.NoError(t, err, "Failed to get facts")
 
-		if len(facts) != 2 {
-			t.Errorf("Expected 2 facts, got %d: %v", len(facts), facts)
-		}
+		assert.Len(t, facts, 2, "Expected 2 facts")
 
 		// Check if facts contain expected values
-		hasLovesPizza := false
-		hasLivesInTokyo := false
-		for _, fact := range facts {
-			if fact == "loves pizza" {
-				hasLovesPizza = true
-			}
-			if fact == "lives in Tokyo" {
-				hasLivesInTokyo = true
-			}
-		}
-
-		if !hasLovesPizza || !hasLivesInTokyo {
-			t.Errorf("Facts missing expected values. Got: %v", facts)
-		}
+		assert.Contains(t, facts, "loves pizza")
+		assert.Contains(t, facts, "lives in Tokyo")
 
 		t.Logf("✓ Successfully added facts: %v", facts)
 	})
@@ -114,18 +98,12 @@ func TestSurrealStore_ApplyDelta(t *testing.T) {
 		removes := []string{}
 
 		err := store.ApplyDelta(testUserID, adds, removes)
-		if err != nil {
-			t.Fatalf("Failed to apply delta (add more): %v", err)
-		}
+		require.NoError(t, err, "Failed to apply delta (add more)")
 
 		facts, err := store.GetFacts(testUserID)
-		if err != nil {
-			t.Fatalf("Failed to get facts: %v", err)
-		}
+		require.NoError(t, err, "Failed to get facts")
 
-		if len(facts) != 3 {
-			t.Errorf("Expected 3 facts, got %d: %v", len(facts), facts)
-		}
+		assert.Len(t, facts, 3, "Expected 3 facts")
 
 		t.Logf("✓ Successfully added more facts: %v", facts)
 	})
@@ -136,25 +114,15 @@ func TestSurrealStore_ApplyDelta(t *testing.T) {
 		removes := []string{"lives in Tokyo"}
 
 		err := store.ApplyDelta(testUserID, adds, removes)
-		if err != nil {
-			t.Fatalf("Failed to apply delta (remove): %v", err)
-		}
+		require.NoError(t, err, "Failed to apply delta (remove)")
 
 		facts, err := store.GetFacts(testUserID)
-		if err != nil {
-			t.Fatalf("Failed to get facts: %v", err)
-		}
+		require.NoError(t, err, "Failed to get facts")
 
-		if len(facts) != 2 {
-			t.Errorf("Expected 2 facts after removal, got %d: %v", len(facts), facts)
-		}
+		assert.Len(t, facts, 2, "Expected 2 facts after removal")
 
 		// Verify "lives in Tokyo" was removed
-		for _, fact := range facts {
-			if fact == "lives in Tokyo" {
-				t.Errorf("Fact 'lives in Tokyo' should have been removed but still exists")
-			}
-		}
+		assert.NotContains(t, facts, "lives in Tokyo", "Fact 'lives in Tokyo' should have been removed")
 
 		t.Logf("✓ Successfully removed fact. Remaining: %v", facts)
 	})
@@ -165,32 +133,15 @@ func TestSurrealStore_ApplyDelta(t *testing.T) {
 		removes := []string{"loves pizza"}
 
 		err := store.ApplyDelta(testUserID, adds, removes)
-		if err != nil {
-			t.Fatalf("Failed to apply delta (update): %v", err)
-		}
+		require.NoError(t, err, "Failed to apply delta (update)")
 
 		facts, err := store.GetFacts(testUserID)
-		if err != nil {
-			t.Fatalf("Failed to get facts: %v", err)
-		}
+		require.NoError(t, err, "Failed to get facts")
 
-		if len(facts) != 2 {
-			t.Errorf("Expected 2 facts after update, got %d: %v", len(facts), facts)
-		}
+		assert.Len(t, facts, 2, "Expected 2 facts after update")
 
-		hasNewYork := false
-		for _, fact := range facts {
-			if fact == "lives in New York" {
-				hasNewYork = true
-			}
-			if fact == "loves pizza" {
-				t.Errorf("Old fact 'loves pizza' should have been removed")
-			}
-		}
-
-		if !hasNewYork {
-			t.Errorf("New fact 'lives in New York' not found. Got: %v", facts)
-		}
+		assert.Contains(t, facts, "lives in New York", "New fact 'lives in New York' not found")
+		assert.NotContains(t, facts, "loves pizza", "Old fact 'loves pizza' should have been removed")
 
 		t.Logf("✓ Successfully updated fact. Current: %v", facts)
 	})
@@ -224,32 +175,23 @@ func TestSurrealStore_RecentMessages(t *testing.T) {
 		}
 
 		for _, msg := range messages {
-			if err := store.AddRecentMessage(testUserID, msg.Role, msg.Text); err != nil {
-				t.Fatalf("Failed to add recent message: %v", err)
-			}
+			err := store.AddRecentMessage(testUserID, msg.Role, msg.Text)
+			require.NoError(t, err, "Failed to add recent message")
 			// Small sleep to ensure timestamps are different (SurrealDB might be fast)
 			time.Sleep(10 * time.Millisecond)
 		}
 
 		// Verify messages
 		storedMessages, err := store.GetRecentMessages(testUserID)
-		if err != nil {
-			t.Fatalf("Failed to get recent messages: %v", err)
-		}
+		require.NoError(t, err, "Failed to get recent messages")
 
-		if len(storedMessages) != 3 {
-			t.Errorf("Expected 3 messages, got %d: %v", len(storedMessages), storedMessages)
-		}
+		assert.Len(t, storedMessages, 3, "Expected 3 messages")
 
 		// Check order and content
 		for i, msg := range storedMessages {
 			expected := messages[i]
-			if msg.Text != expected.Text {
-				t.Errorf("Message text mismatch at index %d. Expected '%s', got '%s'", i, expected.Text, msg.Text)
-			}
-			if msg.Role != expected.Role {
-				t.Errorf("Message role mismatch at index %d. Expected '%s', got '%s'", i, expected.Role, msg.Role)
-			}
+			assert.Equal(t, expected.Text, msg.Text, "Message text mismatch at index %d", i)
+			assert.Equal(t, expected.Role, msg.Role, "Message role mismatch at index %d", i)
 		}
 
 		t.Logf("✓ Successfully added and retrieved messages: %v", storedMessages)
@@ -260,28 +202,21 @@ func TestSurrealStore_RecentMessages(t *testing.T) {
 		// Add 15 more messages (total 18)
 		for i := 0; i < 15; i++ {
 			msg := fmt.Sprintf("Message %d", i)
-			if err := store.AddRecentMessage(testUserID, "user", msg); err != nil {
-				t.Fatalf("Failed to add message: %v", err)
-			}
+			err := store.AddRecentMessage(testUserID, "user", msg)
+			require.NoError(t, err, "Failed to add message")
 			time.Sleep(10 * time.Millisecond)
 		}
 
 		storedMessages, err := store.GetRecentMessages(testUserID)
-		if err != nil {
-			t.Fatalf("Failed to get recent messages: %v", err)
-		}
+		require.NoError(t, err, "Failed to get recent messages")
 
 		// Should be capped at 15
-		if len(storedMessages) != 15 {
-			t.Errorf("Expected 15 messages (limit), got %d", len(storedMessages))
-		}
+		assert.Len(t, storedMessages, 15, "Expected 15 messages (limit)")
 
 		// The last message added should be present
 		if len(storedMessages) > 0 {
 			lastMsg := storedMessages[len(storedMessages)-1]
-			if lastMsg.Text != "Message 14" {
-				t.Errorf("Expected last message to be 'Message 14', got '%s'", lastMsg.Text)
-			}
+			assert.Equal(t, "Message 14", lastMsg.Text, "Expected last message to be 'Message 14'")
 		}
 
 		t.Logf("✓ Successfully enforced message limit. Count: %d", len(storedMessages))
@@ -307,34 +242,22 @@ func TestSurrealStore_State(t *testing.T) {
 	value := "happy"
 
 	// Set state
-	if err := store.SetState(key, value); err != nil {
-		t.Fatalf("Failed to set state: %v", err)
-	}
+	err := store.SetState(key, value)
+	require.NoError(t, err, "Failed to set state")
 
 	// Get state
 	got, err := store.GetState(key)
-	if err != nil {
-		t.Fatalf("Failed to get state: %v", err)
-	}
-
-	if got != value {
-		t.Errorf("Expected state '%s', got '%s'", value, got)
-	}
+	require.NoError(t, err, "Failed to get state")
+	assert.Equal(t, value, got, "Expected state to be %s", value)
 
 	// Update state
 	newValue := "sad"
-	if err := store.SetState(key, newValue); err != nil {
-		t.Fatalf("Failed to update state: %v", err)
-	}
+	err = store.SetState(key, newValue)
+	require.NoError(t, err, "Failed to update state")
 
 	got, err = store.GetState(key)
-	if err != nil {
-		t.Fatalf("Failed to get state after update: %v", err)
-	}
-
-	if got != newValue {
-		t.Errorf("Expected state '%s', got '%s'", newValue, got)
-	}
+	require.NoError(t, err, "Failed to get state after update")
+	assert.Equal(t, newValue, got, "Expected state to be %s", newValue)
 }
 
 func TestSurrealStore_Users(t *testing.T) {
@@ -347,27 +270,14 @@ func TestSurrealStore_Users(t *testing.T) {
 	_ = store.DeleteUserData(userID)
 
 	// Ensure User
-	if err := store.EnsureUser(userID); err != nil {
-		t.Fatalf("Failed to ensure user: %v", err)
-	}
+	err := store.EnsureUser(userID)
+	require.NoError(t, err, "Failed to ensure user")
 
 	// Check if user is in known users
 	users, err := store.GetAllKnownUsers()
-	if err != nil {
-		t.Fatalf("Failed to get all known users: %v", err)
-	}
+	require.NoError(t, err, "Failed to get all known users")
 
-	found := false
-	for _, u := range users {
-		if u == userID {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		t.Errorf("User %s not found in known users list: %v", userID, users)
-	}
+	assert.Contains(t, users, userID, "User %s not found in known users list", userID)
 
 	// Clean up
 	_ = store.DeleteUserData(userID)
@@ -385,22 +295,18 @@ func TestSurrealStore_Reminders(t *testing.T) {
 	// Case 1: Add a reminder due in the past
 	pastDue := time.Now().Add(-1 * time.Hour).Unix()
 	textPast := "This was due an hour ago"
-	if err := store.AddReminder(userID, textPast, pastDue); err != nil {
-		t.Fatalf("Failed to add past reminder: %v", err)
-	}
+	err := store.AddReminder(userID, textPast, pastDue)
+	require.NoError(t, err, "Failed to add past reminder")
 
 	// Case 2: Add a reminder due in the future
 	futureDue := time.Now().Add(1 * time.Hour).Unix()
 	textFuture := "This is due in an hour"
-	if err := store.AddReminder(userID, textFuture, futureDue); err != nil {
-		t.Fatalf("Failed to add future reminder: %v", err)
-	}
+	err = store.AddReminder(userID, textFuture, futureDue)
+	require.NoError(t, err, "Failed to add future reminder")
 
 	// Get due reminders
 	dueReminders, err := store.GetDueReminders()
-	if err != nil {
-		t.Fatalf("Failed to get due reminders: %v", err)
-	}
+	require.NoError(t, err, "Failed to get due reminders")
 
 	// Check results
 	foundPast := false
@@ -419,18 +325,8 @@ func TestSurrealStore_Reminders(t *testing.T) {
 		}
 	}
 
-	if !foundPast {
-		t.Errorf("Expected to find past reminder '%s', but didn't", textPast)
-	}
-	if foundFuture {
-		t.Errorf("Found future reminder '%s' in due list, but shouldn't have", textFuture)
-	}
-
-	// Clean up the future reminder (we need to find its ID first, but GetDueReminders didn't return it)
-	// We can't easily delete it without ID. But that's okay for test environment usually.
-	// However, if we want to be clean:
-	// The `AddReminder` doesn't return ID. This is a design flaw in `Store` interface if we want to manage them immediately.
-	// But for now we just leave it or improve `Store` later.
+	assert.True(t, foundPast, "Expected to find past reminder '%s', but didn't", textPast)
+	assert.False(t, foundFuture, "Found future reminder '%s' in due list, but shouldn't have", textFuture)
 }
 
 func TestSurrealStore_EmojiCache(t *testing.T) {
@@ -447,24 +343,17 @@ func TestSurrealStore_EmojiCache(t *testing.T) {
 	emojis := []string{"😀", "🚀", "🎉"}
 
 	// Set emojis
-	if err := store.SetCachedEmojis(guildID, emojis); err != nil {
-		t.Fatalf("Failed to set cached emojis: %v", err)
-	}
+	err := store.SetCachedEmojis(guildID, emojis)
+	require.NoError(t, err, "Failed to set cached emojis")
 
 	// Get emojis
 	got, err := store.GetCachedEmojis(guildID)
-	if err != nil {
-		t.Fatalf("Failed to get cached emojis: %v", err)
-	}
+	require.NoError(t, err, "Failed to get cached emojis")
 
-	if len(got) != 3 {
-		t.Errorf("Expected 3 emojis, got %d", len(got))
-	}
+	assert.Len(t, got, 3, "Expected 3 emojis")
 
 	for i, e := range emojis {
-		if got[i] != e {
-			t.Errorf("Expected emoji %s at index %d, got %s", e, i, got[i])
-		}
+		assert.Equal(t, e, got[i], "Expected emoji %s at index %d, got %s", e, i, got[i])
 	}
 }
 
@@ -488,51 +377,35 @@ func TestSurrealStore_VectorSearch(t *testing.T) {
 
 	// Add memory A (vector at index 0)
 	vecA := makeVector(0)
-	if err := store.Add(userID, "Memory A", vecA); err != nil {
-		t.Fatalf("Failed to add Memory A: %v", err)
-	}
+	err := store.Add(userID, "Memory A", vecA)
+	require.NoError(t, err, "Failed to add Memory A")
 
 	// Add memory B (vector at index 100)
 	vecB := makeVector(100)
-	if err := store.Add(userID, "Memory B", vecB); err != nil {
-		t.Fatalf("Failed to add Memory B: %v", err)
-	}
+	err = store.Add(userID, "Memory B", vecB)
+	require.NoError(t, err, "Failed to add Memory B")
 
 	// Search for A (exact match)
 	results, err := store.Search(userID, vecA, 5)
-	if err != nil {
-		t.Fatalf("Failed to search: %v", err)
-	}
+	require.NoError(t, err, "Failed to search")
 
-	if len(results) == 0 {
-		t.Errorf("Expected at least 1 result for exact match")
-	} else if results[0] != "Memory A" {
-		t.Errorf("Expected top result to be 'Memory A', got '%s'", results[0])
-	}
+	require.NotEmpty(t, results, "Expected at least 1 result for exact match")
+	assert.Equal(t, "Memory A", results[0], "Expected top result to be 'Memory A'")
 
 	// Search for B (exact match)
 	results, err = store.Search(userID, vecB, 5)
-	if err != nil {
-		t.Fatalf("Failed to search: %v", err)
-	}
+	require.NoError(t, err, "Failed to search")
 
-	if len(results) == 0 {
-		t.Errorf("Expected at least 1 result for exact match")
-	} else if results[0] != "Memory B" {
-		t.Errorf("Expected top result to be 'Memory B', got '%s'", results[0])
-	}
+	require.NotEmpty(t, results, "Expected at least 1 result for exact match")
+	assert.Equal(t, "Memory B", results[0], "Expected top result to be 'Memory B'")
 
 	// Search for orthogonal vector (index 500) - should return nothing or low score
 	vecC := makeVector(500)
 	results, err = store.Search(userID, vecC, 5)
-	if err != nil {
-		t.Fatalf("Failed to search: %v", err)
-	}
+	require.NoError(t, err, "Failed to search")
 
 	// The Search method has a threshold of 0.6. Orthogonal vectors (dot product 0) should be excluded.
-	if len(results) > 0 {
-		t.Errorf("Expected 0 results for orthogonal vector, got %v", results)
-	}
+	assert.Empty(t, results, "Expected 0 results for orthogonal vector, got %v", results)
 
 	// Clean up
 	_ = store.DeleteUserData(userID)

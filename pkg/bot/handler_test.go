@@ -11,6 +11,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockSession implements Session for testing
@@ -123,9 +125,7 @@ func TestHandler_Flow(t *testing.T) {
 
 	// Use a temp dir for memory
 	tmpDir, err := os.MkdirTemp("", "marinai_flow_test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 	memoryStore := memory.NewFileStore(tmpDir)
 
@@ -171,32 +171,21 @@ func TestHandler_Flow(t *testing.T) {
 	// Verify Results
 
 	// 1. Check if reply was sent
-	if len(mockSession.SentMessages) == 0 {
-		t.Fatal("FAIL: No reply sent")
-	}
+	require.NotEmpty(t, mockSession.SentMessages, "FAIL: No reply sent")
 	reply := mockSession.SentMessages[0]
 	t.Logf("PASS: Bot replied: %s", reply)
 
 	// 2. Check if typing was triggered
-	if mockSession.TypingCalls == 0 {
-		t.Fatal("FAIL: Typing indicator not triggered")
-	}
+	assert.Greater(t, mockSession.TypingCalls, 0, "FAIL: Typing indicator not triggered")
 	t.Log("PASS: Typing indicator triggered")
 
 	// 3. Check Memory - search for the pre-populated memory
 	emb, err := embeddingClient.Embed("programming language")
-	if err != nil {
-		t.Fatalf("FAIL: Embedding error: %v", err)
-	}
+	require.NoError(t, err, "FAIL: Embedding error")
 
 	matches, err := memoryStore.Search("test_user_1", emb, 5)
-	if err != nil {
-		t.Fatalf("FAIL: Memory search error: %v", err)
-	}
-
-	if len(matches) == 0 {
-		t.Fatal("FAIL: No memories found")
-	}
+	require.NoError(t, err, "FAIL: Memory search error")
+	require.NotEmpty(t, matches, "FAIL: No memories found")
 
 	t.Logf("PASS: Found %d memories:", len(matches))
 	for _, m := range matches {
@@ -231,9 +220,7 @@ func TestHandler_FlowStructure(t *testing.T) {
 	}
 
 	tmpDir, err := os.MkdirTemp("", "marinai_structure_test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 	memoryStore := memory.NewFileStore(tmpDir)
 
@@ -244,7 +231,6 @@ func TestHandler_FlowStructure(t *testing.T) {
 		memoryStore.Add("test_user_structure", testMemory, testEmb)
 	}
 
-	// Add some recent messages to create rolling context
 	// Add some recent messages to create rolling context
 	memoryStore.AddRecentMessage("test_user_structure", "user", "Hi Marin!")
 	memoryStore.AddRecentMessage("test_user_structure", "assistant", "Oh, it's you again...")
@@ -278,27 +264,21 @@ func TestHandler_FlowStructure(t *testing.T) {
 	handler.HandleMessage(mockSession, userMsg)
 	time.Sleep(2 * time.Second)
 
-	if len(mockSession.SentMessages) == 0 {
-		t.Fatal("FAIL: No reply sent")
-	}
+	require.NotEmpty(t, mockSession.SentMessages, "FAIL: No reply sent")
 
 	t.Logf("PASS: Bot replied: %s", mockSession.SentMessages[0])
 	t.Log("PASS: Flow structure test completed")
 
 	// Verify recent messages were updated
 	recentMsgs, _ := memoryStore.GetRecentMessages("test_user_structure")
-	if len(recentMsgs) < 2 {
-		t.Fatal("FAIL: Recent messages not updated properly")
-	}
+	assert.GreaterOrEqual(t, len(recentMsgs), 2, "FAIL: Recent messages not updated properly")
 	t.Logf("PASS: Recent messages updated (count: %d)", len(recentMsgs))
 }
 
 // TestHandler_RollingContext tests that the rolling chat context is properly maintained and limited
 func TestHandler_RollingContext(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "marinai_rolling_test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 	memoryStore := memory.NewFileStore(tmpDir)
 
@@ -311,13 +291,9 @@ func TestHandler_RollingContext(t *testing.T) {
 	}
 
 	recentMsgs, err := memoryStore.GetRecentMessages(userID)
-	if err != nil {
-		t.Fatalf("FAIL: Error getting recent messages: %v", err)
-	}
+	require.NoError(t, err, "FAIL: Error getting recent messages")
 
-	if len(recentMsgs) > 15 {
-		t.Fatalf("FAIL: Rolling context not limited (got %d messages, expected max 15)", len(recentMsgs))
-	}
+	assert.LessOrEqual(t, len(recentMsgs), 15, "FAIL: Rolling context not limited (got %d messages, expected max 15)", len(recentMsgs))
 
 	t.Logf("PASS: Rolling context properly limited to %d messages", len(recentMsgs))
 }
@@ -348,9 +324,7 @@ func TestHandler_DMBehavior(t *testing.T) {
 	}
 
 	tmpDir, err := os.MkdirTemp("", "marinai_dm_test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 	memoryStore := memory.NewFileStore(tmpDir)
 
@@ -381,9 +355,7 @@ func TestHandler_DMBehavior(t *testing.T) {
 	handler.HandleMessage(mockSession, dmMsg)
 	time.Sleep(2 * time.Second)
 
-	if len(mockSession.SentMessages) == 0 {
-		t.Fatal("FAIL: Bot did not reply in DM")
-	}
+	require.NotEmpty(t, mockSession.SentMessages, "FAIL: Bot did not reply in DM")
 
 	t.Logf("PASS: Bot replied in DM: %s", mockSession.SentMessages[0])
 }

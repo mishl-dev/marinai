@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // MockRecordID simulates the struct returned by the SurrealDB driver
@@ -46,9 +48,7 @@ func TestIDExtractionWithReflection(t *testing.T) {
 
 	// Case 1: ID is a simple string
 	rowStringID := map[string]interface{}{"id": "reminders:123"}
-	if id := extractID(rowStringID); id != "reminders:123" {
-		t.Errorf("Case 1 (String) failed: got %s", id)
-	}
+	assert.Equal(t, "reminders:123", extractID(rowStringID), "Case 1 (String) failed")
 
 	// Case 2: ID is a map (e.g., from JSON unmarshal)
 	rowMapID := map[string]interface{}{
@@ -57,16 +57,12 @@ func TestIDExtractionWithReflection(t *testing.T) {
 			"ID":    "abc",
 		},
 	}
-	if id := extractID(rowMapID); id != "reminders:abc" {
-		t.Errorf("Case 2 (Map) failed: got %s", id)
-	}
+	assert.Equal(t, "reminders:abc", extractID(rowMapID), "Case 2 (Map) failed")
 
 	// Case 3: ID is a struct (SurrealDB driver behavior)
 	mockStruct := MockRecordID{Table: "reminders", ID: "28qa9te5wuz8m1akx1xr"}
 	rowStructID := map[string]interface{}{"id": mockStruct}
 
 	expected := "reminders:28qa9te5wuz8m1akx1xr"
-	if id := extractID(rowStructID); id != expected {
-		t.Errorf("Case 3 (Struct) failed: expected %s, got %s", expected, id)
-	}
+	assert.Equal(t, expected, extractID(rowStructID), "Case 3 (Struct) failed")
 }
