@@ -117,6 +117,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error creating Discord session: %v", err)
 	}
+	// The core requirement: Masquerade as an Android client
+	dg.Identify.Properties.Browser = "Discord Android"
+	dg.Identify.Properties.Device = "Discord Android" // Consistency
 
 	// Register Handlers
 	dg.AddHandler(handler.MessageCreate)
