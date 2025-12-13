@@ -634,7 +634,7 @@ STRICT RULES FOR MEMORY:
 
 RULES FOR REMINDERS:
 - If the user mentions a specific future event (exam, interview, trip) with a time frame, create a reminder.
-- "due_at": The calculated UTC unix timestamp (integer) for when the event is happening (or slightly after, to ask "how did it go").
+- "delay_seconds": The number of seconds from the "Current Time" (provided above) until the event happens.
 - "text": What the event is (e.g., "Math Exam", "Job Interview").
 - If no specific time is given, do not create a reminder.
 
@@ -683,8 +683,8 @@ Output ONLY valid JSON.`,
 	jsonStr = strings.TrimSpace(jsonStr)
 
 	type ReminderRequest struct {
-		Text  string `json:"text"`
-		DueAt int64  `json:"due_at"`
+		Text         string `json:"text"`
+		DelaySeconds int64  `json:"delay_seconds"`
 	}
 
 	type Delta struct {
@@ -715,10 +715,10 @@ Output ONLY valid JSON.`,
 	// 7. Add Reminders
 	// ---------------------------------------------------------
 	for _, r := range delta.Reminders {
-		// Basic validation: due date must be in future
-		if r.DueAt > time.Now().Unix() {
-			log.Printf("Adding reminder for user %s: %s at %d", userId, r.Text, r.DueAt)
-			if err := h.memoryStore.AddReminder(userId, r.Text, r.DueAt); err != nil {
+		if r.DelaySeconds > 0 {
+			dueAt := time.Now().Unix() + r.DelaySeconds
+			log.Printf("Adding reminder for user %s: %s at %d (in %d seconds)", userId, r.Text, dueAt, r.DelaySeconds)
+			if err := h.memoryStore.AddReminder(userId, r.Text, dueAt); err != nil {
 				log.Printf("Error adding reminder: %v", err)
 			}
 		}
