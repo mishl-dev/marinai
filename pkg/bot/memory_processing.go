@@ -27,44 +27,16 @@ func (h *Handler) getRecentMessages(userId string) []memory.RecentMessageItem {
 
 func (h *Handler) extractMemories(userId string, userName string, userMessage string, botReply string) {
 	// ---------------------------------------------------------
-	// 1. Heuristic Filters (Save compute & reduce noise)
+	// 1. Basic Filter (Save compute on trivial messages)
 	// ---------------------------------------------------------
 	cleanMsg := strings.TrimSpace(userMessage)
 
-	// Filter A: Length Check
-	// Ignore short, trivial messages like "Hi", "Thanks", "Ok", "Cool".
-	// Long-term facts usually require a sentence structure.
-	if len(cleanMsg) < 12 {
+	// Skip very short messages - unlikely to contain memorable info
+	if len(cleanMsg) < 10 {
 		return
 	}
 
-	// Filter B: Keyword/Subject Check
-	// If the user isn't talking about themselves, we usually don't need to memorize it.
-	// This skips questions like "What is the weather?" or "Write code for X".
-	triggers := []string{
-		"i am", "i'm", "my", "mine", // Self-identification
-		"i live", "i work", "i study", // Life details
-		"i like", "i love", "i hate", "i prefer", // Preferences
-		"i have", "i've", // Possession/Experience
-		"don't like", "dislike", // Negative preferences
-		"name is", "call me", // Naming
-		"remember", // Explicit instructions
-	}
-
-	hasTrigger := false
-	lowerMsg := strings.ToLower(cleanMsg)
-	for _, t := range triggers {
-		if strings.Contains(lowerMsg, t) {
-			hasTrigger = true
-			break
-		}
-	}
-
-	// If no self-reference keywords are found, abort.
-	if !hasTrigger {
-		return
-	}
-
+	// Let the LLM decide what's worth saving - no hardcoded keyword filters
 	log.Printf("Analyzing for memories: %s", cleanMsg)
 
 	// ---------------------------------------------------------
@@ -88,7 +60,7 @@ func (h *Handler) extractMemories(userId string, userName string, userMessage st
 	now := time.Now().UTC()
 	currentTimeStr := now.Format("Monday, 2006-01-02 15:04 UTC")
 
-	// User Prompt: Focuses on specific logical constraints
+	// User Prompt: Focuses on extracting useful personal information
 	extractionPrompt := fmt.Sprintf(`Current Profile:
 %s
 
@@ -100,29 +72,35 @@ Marin: "%s"
 
 Task: Analyze the interaction and output a JSON object with "add", "remove", and "reminders" lists.
 
-STRICT RULES FOR MEMORY:
-1. CONSERVATIVE: Bias towards returning empty lists. Only act if the information is explicitly stated and permanent.
-2. IGNORE TEMPORARY: Do NOT save states like "I am hungry", "I am tired", "I am driving", or "I am busy".
-3. IGNORE TRIVIAL: Do NOT save weak preferences or small talk (e.g., "I like that joke").
-4. CONTRADICTIONS: If the user explicitly contradicts an item in 'Current Profile' (e.g., moved to a new city), add the new fact to 'add' and the old fact to 'remove'.
+WHAT TO SAVE (add to "add" list):
+- Location: where they live, where they moved to, where they're from
+- Job/School: what they do, where they work/study  
+- Hobbies: games they play, shows they watch, things they enjoy
+- Relationships: if they mention partners, pets, family
+- Strong preferences: favorite things, things they hate
+- Life events: graduations, new jobs, moves, major purchases
 
-RULES FOR REMINDERS:
-- If the user mentions a specific future event (exam, interview, trip) with a time frame, create a reminder.
-- "delay_seconds": The number of seconds from the "Current Time" (provided above) until the event happens.
-- "text": What the event is (e.g., "Math Exam", "Job Interview").
-- If no specific time is given, do not create a reminder.
+WHAT NOT TO SAVE:
+- Temporary states: "I'm hungry", "I'm tired", "I'm busy right now"
+- Single-use preferences: "I like that joke", "that's funny"
+- Questions they asked
+- Generic greetings
 
-Output ONLY valid JSON.`, currentProfile, currentTimeStr, userName, userMessage, botReply)
+CONTRADICTIONS:
+If the user says something that contradicts an existing fact (e.g., they moved to a new city), add the new fact to "add" AND the old conflicting fact to "remove".
+
+REMINDERS:
+If they mention a specific future event with a timeframe, create a reminder with "delay_seconds" (seconds until event) and "text" (event description).
+
+Output ONLY valid JSON. Example: {"add": ["Lives in Tokyo"], "remove": [], "reminders": []}`, currentProfile, currentTimeStr, userName, userMessage, botReply)
 
 	messages := []cerebras.Message{
 		{
 			Role: "system",
-			Content: `You are a strict Database Administrator responsible for long-term user records and scheduling.
-Your goal is to keep the database clean and concise.
-Reject all trivial information.
-Reject all temporary states (moods, current activities) UNLESS they are future scheduled events.
-Only record hard facts that will remain true for months.
-Output ONLY valid JSON.`,
+			Content: `You are a helpful assistant that extracts personal facts from conversations.
+Your job is to identify and save important information about the user that would be useful to remember for future conversations.
+Be thorough - if someone shares personal information, save it.
+Output ONLY valid JSON with "add", "remove", and "reminders" arrays.`,
 		},
 		{
 			Role:    "user",
