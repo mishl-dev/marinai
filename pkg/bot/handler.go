@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,8 @@ type Session interface {
 	Channel(channelID string, options ...discordgo.RequestOption) (*discordgo.Channel, error)
 	GuildEmojis(guildID string, options ...discordgo.RequestOption) ([]*discordgo.Emoji, error)
 	UserChannelCreate(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error)
+	MessageReactionAdd(channelID, messageID, emojiID string) error
+	UpdateStatusComplex(usd discordgo.UpdateStatusData) error
 }
 
 // DiscordSession adapts discordgo.Session to the Session interface
@@ -45,6 +48,14 @@ func (s *DiscordSession) GuildEmojis(guildID string, options ...discordgo.Reques
 
 func (s *DiscordSession) UserChannelCreate(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
 	return s.Session.UserChannelCreate(recipientID, options...)
+}
+
+func (s *DiscordSession) MessageReactionAdd(channelID, messageID, emojiID string) error {
+	return s.Session.MessageReactionAdd(channelID, messageID, emojiID)
+}
+
+func (s *DiscordSession) UpdateStatusComplex(usd discordgo.UpdateStatusData) error {
+	return s.Session.UpdateStatusComplex(usd)
 }
 
 type CerebrasClient interface {
@@ -102,10 +113,17 @@ func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, m memory.Sto
 		lastGlobalInteraction:      time.Now(), // Initialize with current time so she doesn't feel lonely immediately
 	}
 
+	// Validate maintenance interval to prevent panic
+	if h.maintenanceInterval <= 0 {
+		h.maintenanceInterval = 24 * time.Hour
+	}
+
 	// Start background goroutines
 	go h.clearInactiveUsers()
 	go h.maintainMemories()
 	go h.checkForLoneliness()
+	go h.runDailyRoutine()
+	go h.checkReminders()
 
 	return h
 }
@@ -310,11 +328,8 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	}
 
 	if !shouldReply {
-		// Even if not replying, we might want to add to recent context?
-		// For now, let's only add if we reply or are involved.
-		// Actually, if we don't reply, we should probably NOT add it to context
-		// unless we want to track "overheard" conversations.
-		// Let's stick to adding only when we reply for now to keep context clean.
+		// Check for proactive reactions even if not replying
+		h.evaluateReaction(s, m.ChannelID, m.ID, m.Content)
 		return
 	}
 
@@ -550,15 +565,21 @@ func (h *Handler) extractMemories(userId string, userName string, userMessage st
 		currentProfile = "- " + strings.Join(existingFacts, "\n- ")
 	}
 
+	// Current time for reminder calculation
+	now := time.Now().UTC()
+	currentTimeStr := now.Format("Monday, 2006-01-02 15:04 UTC")
+
 	// User Prompt: Focuses on specific logical constraints
 	extractionPrompt := fmt.Sprintf(`Current Profile:
 %s
+
+Current Time: %s
 
 New Interaction:
 %s: "%s"
 Marin: "%s"
 
-Task: Analyze the interaction and output a JSON object with "add" and "remove" lists.
+Task: Analyze the interaction and output a JSON object with "add", "remove", and "reminders" lists.
 
 STRICT RULES FOR MEMORY:
 1. CONSERVATIVE: Bias towards returning empty lists. Only act if the information is explicitly stated and permanent.
@@ -567,16 +588,22 @@ STRICT RULES FOR MEMORY:
 4. IGNORE TRIVIAL: Do NOT save weak preferences or small talk (e.g., "I like that joke").
 5. CONTRADICTIONS: If the user explicitly contradicts an item in 'Current Profile' (e.g., moved to a new city), add the new fact to 'add' and the old fact to 'remove'.
 
-Output ONLY valid JSON.`, currentProfile, userName, userMessage, botReply)
+RULES FOR REMINDERS:
+- If the user mentions a specific future event (exam, interview, trip) with a time frame, create a reminder.
+- "due_at": The calculated UTC unix timestamp (integer) for when the event is happening (or slightly after, to ask "how did it go").
+- "text": What the event is (e.g., "Math Exam", "Job Interview").
+- If no specific time is given, do not create a reminder.
+
+Output ONLY valid JSON.`, currentProfile, currentTimeStr, userName, userMessage, botReply)
 
 	messages := []cerebras.Message{
 		{
 			Role: "system",
 			// System Prompt: Sets the persona to be strict and lazy (avoids false positives)
-			Content: `You are a strict Database Administrator responsible for long-term user records. 
+			Content: `You are a strict Database Administrator responsible for long-term user records and scheduling.
 Your goal is to keep the database clean and concise. 
 Reject all trivial information. 
-Reject all temporary states (moods, current activities). 
+Reject all temporary states (moods, current activities) UNLESS they are future scheduled events.
 Only record hard facts that will remain true for months. 
 Output ONLY valid JSON.`,
 		},
@@ -611,9 +638,15 @@ Output ONLY valid JSON.`,
 	}
 	jsonStr = strings.TrimSpace(jsonStr)
 
+	type ReminderRequest struct {
+		Text  string `json:"text"`
+		DueAt int64  `json:"due_at"`
+	}
+
 	type Delta struct {
-		Add    []string `json:"add"`
-		Remove []string `json:"remove"`
+		Add       []string          `json:"add"`
+		Remove    []string          `json:"remove"`
+		Reminders []ReminderRequest `json:"reminders"`
 	}
 
 	var delta Delta
@@ -630,6 +663,19 @@ Output ONLY valid JSON.`,
 		log.Printf("Applying memory delta for user %s: +%v, -%v", userId, delta.Add, delta.Remove)
 		if err := h.memoryStore.ApplyDelta(userId, delta.Add, delta.Remove); err != nil {
 			log.Printf("Error applying memory delta: %v", err)
+		}
+	}
+
+	// ---------------------------------------------------------
+	// 7. Add Reminders
+	// ---------------------------------------------------------
+	for _, r := range delta.Reminders {
+		// Basic validation: due date must be in future
+		if r.DueAt > time.Now().Unix() {
+			log.Printf("Adding reminder for user %s: %s at %d", userId, r.Text, r.DueAt)
+			if err := h.memoryStore.AddReminder(userId, r.Text, r.DueAt); err != nil {
+				log.Printf("Error adding reminder: %v", err)
+			}
 		}
 	}
 }
@@ -715,6 +761,194 @@ func (h *Handler) checkForLoneliness() {
 
 	for range ticker.C {
 		h.performLonelinessCheck()
+	}
+}
+
+func (h *Handler) checkReminders() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if h.session == nil {
+			continue
+		}
+
+		reminders, err := h.memoryStore.GetDueReminders()
+		if err != nil {
+			log.Printf("Error getting reminders: %v", err)
+			continue
+		}
+
+		for _, r := range reminders {
+			// Process each reminder
+			if err := h.processReminder(r); err != nil {
+				log.Printf("Error processing reminder %s: %v. Retrying in 1 hour.", r.ID, err)
+				// Retry in 1 hour to avoid loop
+				r.DueAt += 3600
+				if updateErr := h.memoryStore.UpdateReminder(r); updateErr != nil {
+					log.Printf("Error updating reminder %s: %v", r.ID, updateErr)
+				}
+				continue
+			}
+
+			// Delete reminder after successful processing
+			if err := h.memoryStore.DeleteReminder(r.ID); err != nil {
+				log.Printf("Error deleting reminder %s: %v", r.ID, err)
+			}
+		}
+	}
+}
+
+func (h *Handler) processReminder(r memory.Reminder) error {
+	// 1. Generate contextual message
+	user, err := h.session.User(r.UserID)
+	userName := "User"
+	if err == nil {
+		userName = user.Username
+		if user.GlobalName != "" {
+			userName = user.GlobalName
+		}
+	}
+
+	prompt := fmt.Sprintf(`You are Marin Kitagawa. You remembered that %s had an event recently: "%s".
+
+	Write a short, friendly message asking them how it went.
+	- Show you care.
+	- Be bubbly and supportive.
+	- Keep it casual.`, userName, r.Text)
+
+	messages := []cerebras.Message{
+		{Role: "system", Content: "You are Marin Kitagawa."},
+		{Role: "user", Content: prompt},
+	}
+
+	reply, err := h.cerebrasClient.ChatCompletion(messages)
+	if err != nil {
+		return fmt.Errorf("error generating message: %w", err)
+	}
+
+	// 2. Send DM
+	ch, err := h.session.UserChannelCreate(r.UserID)
+	if err != nil {
+		return fmt.Errorf("error creating DM: %w", err)
+	}
+
+	_, err = h.session.ChannelMessageSend(ch.ID, reply)
+	if err != nil {
+		return fmt.Errorf("error sending message: %w", err)
+	}
+
+	log.Printf("Sent reminder to %s about '%s'", userName, r.Text)
+	return nil
+}
+
+func (h *Handler) evaluateReaction(s Session, channelID, messageID, content string) {
+	// Simple heuristic: if the message is too short, ignore
+	if len(content) < 5 {
+		return
+	}
+
+	labels := []string{
+		"happy, celebratory, good news, excitement",
+		"funny, hilarious, joke, meme",
+		"sad, disappointing, bad news, sympathy",
+		"cute, adorable, wholesome",
+		"neutral, boring, question, statement",
+	}
+
+	label, score, err := h.classifierClient.Classify(content, labels)
+	if err != nil {
+		return
+	}
+
+	// Only react if confidence is high
+	if score < 0.85 {
+		return
+	}
+
+	var emoji string
+	switch label {
+	case "happy, celebratory, good news, excitement":
+		emoji = "🎉"
+	case "funny, hilarious, joke, meme":
+		emoji = "😂"
+	case "sad, disappointing, bad news, sympathy":
+		emoji = "🥺"
+	case "cute, adorable, wholesome":
+		emoji = "✨"
+	default:
+		return
+	}
+
+	// Add random chance (don't react to EVERYTHING) - 50%
+	if rand.Float64() < 0.5 {
+		if err := s.MessageReactionAdd(channelID, messageID, emoji); err != nil {
+			log.Printf("Error adding reaction: %v", err)
+		}
+	}
+}
+
+func (h *Handler) runDailyRoutine() {
+	ticker := time.NewTicker(15 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if h.session == nil {
+			continue
+		}
+
+		// Calculate status based on time (UTC+9 for Japan time, as Marin is Japanese)
+		// Use FixedZone to avoid dependency on tzdata and panics if location is not found
+		loc := time.FixedZone("Asia/Tokyo", 9*60*60)
+		now := time.Now().In(loc)
+		hour := now.Hour()
+
+		var statusText string
+		var statusType discordgo.ActivityType
+		var emoji string
+
+		switch {
+		case hour >= 7 && hour < 8:
+			statusText = "Running late for school! 🍞"
+			statusType = discordgo.ActivityTypeCustom
+			emoji = "🍞"
+		case hour >= 8 && hour < 15:
+			statusText = "At school... sleepy... 🏫"
+			statusType = discordgo.ActivityTypeCustom
+			emoji = "🏫"
+		case hour >= 15 && hour < 18:
+			statusText = "Shopping for fabric 🧵"
+			statusType = discordgo.ActivityTypeCustom
+			emoji = "🧵"
+		case hour >= 18 && hour < 20:
+			statusText = "Watching anime! 📺"
+			statusType = discordgo.ActivityTypeWatching
+			emoji = "📺"
+		case hour >= 20 && hour < 23:
+			statusText = "Sewing... just one more stitch... 🪡"
+			statusType = discordgo.ActivityTypeCustom
+			emoji = "🪡"
+		default: // 23 - 07
+			statusText = "Sleeping... 😴"
+			statusType = discordgo.ActivityTypeCustom
+			emoji = "😴"
+		}
+
+		err := h.session.UpdateStatusComplex(discordgo.UpdateStatusData{
+			Activities: []*discordgo.Activity{
+				{
+					Name:  "Daily Routine",
+					Type:  statusType,
+					State: statusText,
+					Emoji: discordgo.Emoji{Name: emoji},
+				},
+			},
+			Status: "online",
+			AFK:    false,
+		})
+		if err != nil {
+			log.Printf("Error updating status: %v", err)
+		}
 	}
 }
 

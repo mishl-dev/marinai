@@ -34,6 +34,14 @@ type RecentMessageItem struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
+type Reminder struct {
+	ID        string `json:"id"`
+	UserID    string `json:"user_id"`
+	Text      string `json:"text"`
+	DueAt     int64  `json:"due_at"`
+	CreatedAt int64  `json:"created_at"`
+}
+
 type Store interface {
 	Add(userId string, text string, vector []float32) error
 	Search(userId string, queryVector []float32, limit int) ([]string, error)
@@ -55,6 +63,12 @@ type Store interface {
 
 	// Social Features
 	GetAllKnownUsers() ([]string, error)
+
+	// Reminders
+	AddReminder(userId string, text string, dueAt int64) error
+	GetDueReminders() ([]Reminder, error)
+	UpdateReminder(reminder Reminder) error
+	DeleteReminder(id string) error
 }
 
 type FileStore struct {
@@ -307,4 +321,20 @@ func (vs *FileStore) SetCachedEmojis(guildID string, emojis []string) error {
 
 func (vs *FileStore) GetAllKnownUsers() ([]string, error) {
 	return []string{}, nil
+}
+
+func (vs *FileStore) AddReminder(userId string, text string, dueAt int64) error {
+	return nil
+}
+
+func (vs *FileStore) GetDueReminders() ([]Reminder, error) {
+	return []Reminder{}, nil
+}
+
+func (vs *FileStore) UpdateReminder(reminder Reminder) error {
+	return nil
+}
+
+func (vs *FileStore) DeleteReminder(id string) error {
+	return nil
 }
