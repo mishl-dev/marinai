@@ -176,7 +176,7 @@ func main() {
 				},
 			},
 		},
-		Status: "online",
+		Status: "idle",
 		AFK:    true,
 	})
 	if err != nil {
