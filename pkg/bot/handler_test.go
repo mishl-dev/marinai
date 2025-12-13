@@ -74,6 +74,10 @@ func (m *MockSession) GuildEmojis(guildID string, options ...discordgo.RequestOp
 	return []*discordgo.Emoji{}, nil
 }
 
+func (m *MockSession) UserChannelCreate(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+	return &discordgo.Channel{ID: "dm_channel"}, nil
+}
+
 type MockClassifier struct{}
 
 func (m *MockClassifier) Classify(text string, labels []string) (string, float64, error) {

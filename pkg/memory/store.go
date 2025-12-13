@@ -52,6 +52,9 @@ type Store interface {
 	// Emoji Cache
 	GetCachedEmojis(guildID string) ([]string, error)
 	SetCachedEmojis(guildID string, emojis []string) error
+
+	// Social Features
+	GetAllKnownUsers() ([]string, error)
 }
 
 type FileStore struct {
@@ -300,4 +303,8 @@ func (vs *FileStore) GetCachedEmojis(guildID string) ([]string, error) {
 
 func (vs *FileStore) SetCachedEmojis(guildID string, emojis []string) error {
 	return nil
+}
+
+func (vs *FileStore) GetAllKnownUsers() ([]string, error) {
+	return []string{}, nil
 }

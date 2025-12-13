@@ -143,6 +143,10 @@ func (m *mockMemoryStore) SetCachedClassification(text string, model string, lab
 	return nil
 }
 
+func (m *mockMemoryStore) GetAllKnownUsers() ([]string, error) {
+	return []string{}, nil
+}
+
 // Mock Discord Session
 type mockDiscordSession struct {
 	ChannelMessageSendFunc        func(channelID string, content string, options ...discordgo.RequestOption) (*discordgo.Message, error)
@@ -201,6 +205,10 @@ func (m *mockDiscordSession) GuildEmojis(guildID string, options ...discordgo.Re
 		return m.GuildEmojisFunc(guildID, options...)
 	}
 	return []*discordgo.Emoji{}, nil
+}
+
+func (m *mockDiscordSession) UserChannelCreate(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+	return &discordgo.Channel{ID: "dm_channel"}, nil
 }
 
 func TestMessageFlow(t *testing.T) {

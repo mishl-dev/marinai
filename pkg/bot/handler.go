@@ -23,6 +23,7 @@ type Session interface {
 	User(userID string) (*discordgo.User, error)
 	Channel(channelID string, options ...discordgo.RequestOption) (*discordgo.Channel, error)
 	GuildEmojis(guildID string, options ...discordgo.RequestOption) ([]*discordgo.Emoji, error)
+	UserChannelCreate(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error)
 }
 
 // DiscordSession adapts discordgo.Session to the Session interface
@@ -40,6 +41,10 @@ func (s *DiscordSession) Channel(channelID string, options ...discordgo.RequestO
 
 func (s *DiscordSession) GuildEmojis(guildID string, options ...discordgo.RequestOption) ([]*discordgo.Emoji, error) {
 	return s.Session.GuildEmojis(guildID, options...)
+}
+
+func (s *DiscordSession) UserChannelCreate(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
+	return s.Session.UserChannelCreate(recipientID, options...)
 }
 
 type CerebrasClient interface {
@@ -73,6 +78,11 @@ type Handler struct {
 	maintenanceInterval        time.Duration
 	activeUsers                map[string]bool
 	activeUsersMu              sync.RWMutex
+
+	// Loneliness logic
+	lastGlobalInteraction time.Time
+	lastGlobalMu          sync.RWMutex
+	session               Session
 }
 
 func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, m memory.Store, messageProcessingDelay float64, factAgingDays int, factSummarizationThreshold int, maintenanceIntervalHours float64) *Handler {
@@ -89,13 +99,19 @@ func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, m memory.Sto
 		factSummarizationThreshold: factSummarizationThreshold,
 		maintenanceInterval:        time.Duration(maintenanceIntervalHours * float64(time.Hour)),
 		activeUsers:                make(map[string]bool),
+		lastGlobalInteraction:      time.Now(), // Initialize with current time so she doesn't feel lonely immediately
 	}
 
 	// Start background goroutines
 	go h.clearInactiveUsers()
 	go h.maintainMemories()
+	go h.checkForLoneliness()
 
 	return h
+}
+
+func (h *Handler) SetSession(s Session) {
+	h.session = s
 }
 
 func (h *Handler) SetBotID(id string) {
@@ -662,8 +678,12 @@ func (h *Handler) sendSplitMessage(s Session, channelID, content string, referen
 
 func (h *Handler) updateLastMessageTime(userID string) {
 	h.lastMessageMu.Lock()
-	defer h.lastMessageMu.Unlock()
 	h.lastMessageTimes[userID] = time.Now()
+	h.lastMessageMu.Unlock()
+
+	h.lastGlobalMu.Lock()
+	h.lastGlobalInteraction = time.Now()
+	h.lastGlobalMu.Unlock()
 }
 
 func (h *Handler) clearInactiveUsers() {
@@ -686,6 +706,120 @@ func (h *Handler) clearInactiveUsers() {
 		}
 		h.lastMessageMu.Unlock()
 	}
+}
+
+func (h *Handler) checkForLoneliness() {
+	// Check every hour
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		h.performLonelinessCheck()
+	}
+}
+
+// performLonelinessCheck is separated for testing
+func (h *Handler) performLonelinessCheck() bool {
+	// Loneliness threshold: 4 hours of no interaction
+	const lonelinessThreshold = 4 * time.Hour
+
+	// 1. Check if lonely
+	h.lastGlobalMu.RLock()
+	isLonely := time.Since(h.lastGlobalInteraction) > lonelinessThreshold
+	h.lastGlobalMu.RUnlock()
+
+	if !isLonely {
+		return false
+	}
+
+	if h.session == nil {
+		log.Println("Session not set, skipping loneliness check")
+		return false
+	}
+
+	// 3. Get candidates
+	users, err := h.memoryStore.GetAllKnownUsers()
+	if err != nil {
+		log.Printf("Error getting known users: %v", err)
+		return false
+	}
+
+	if len(users) == 0 {
+		return false
+	}
+
+	// 4. Select a user
+	// Just pick a random user
+	idx := time.Now().UnixNano() % int64(len(users))
+	targetUserID := users[idx]
+
+	// 5. Generate message
+	// We need a context for the user to make it personal
+	facts, _ := h.memoryStore.GetFacts(targetUserID)
+	profileText := "No known facts."
+	if len(facts) > 0 {
+		profileText = "- " + strings.Join(facts, "\n- ")
+	}
+
+	// Get display name (requires fetching user from Discord, or storing it)
+	// We'll try to fetch from Discord
+	user, err := h.session.User(targetUserID)
+	userName := "User"
+	if err == nil {
+		userName = user.Username
+		if user.GlobalName != "" {
+			userName = user.GlobalName
+		}
+	}
+
+	prompt := fmt.Sprintf(`You are Marin Kitagawa. You haven't talked to anyone in a while and you feel a bit lonely/bored.
+You decide to text one of your friends, %s.
+
+User Profile:
+%s
+
+Write a short, casual, friendly message to them to start a conversation.
+- Be your usual bubbly self.
+- Maybe reference something from their profile if relevant, or just say you're bored.
+- Keep it under 2 sentences.
+- Do NOT say "User Profile" or "System". just the message.`, userName, profileText)
+
+	messages := []cerebras.Message{
+		{Role: "system", Content: "You are Marin Kitagawa, a cosplayer and otaku."},
+		{Role: "user", Content: prompt},
+	}
+
+	reply, err := h.cerebrasClient.ChatCompletion(messages)
+	if err != nil {
+		log.Printf("Error generating lonely message: %v", err)
+		return false
+	}
+
+	// 6. Send DM
+	// Create DM channel
+	ch, err := h.session.UserChannelCreate(targetUserID)
+	if err != nil {
+		log.Printf("Error creating DM channel for %s: %v", targetUserID, err)
+		return false
+	}
+
+	_, err = h.session.ChannelMessageSend(ch.ID, reply)
+	if err != nil {
+		log.Printf("Error sending lonely message to %s: %v", targetUserID, err)
+		return false
+	}
+
+	log.Printf("Sent lonely message to %s: %s", userName, reply)
+
+	// Update global interaction time so we don't spam
+	h.lastGlobalMu.Lock()
+	h.lastGlobalInteraction = time.Now()
+	h.lastGlobalMu.Unlock()
+
+	// Also update that specific user's last message time?
+	h.updateLastMessageTime(targetUserID)
+
+	return true
 }
 
 func (h *Handler) WaitForReady() {

@@ -129,6 +129,8 @@ func main() {
 
 	// Set Bot ID in handler (so it can ignore itself)
 	handler.SetBotID(dg.State.User.ID)
+	// Set Session in handler (for background tasks like loneliness check)
+	handler.SetSession(&bot.DiscordSession{Session: dg})
 
 	// Register slash commands (empty string = global, or specify guild ID for faster testing)
 	// For production, use "" for global commands. For development, use a specific guild ID for instant updates.
