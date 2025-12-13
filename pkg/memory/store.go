@@ -70,6 +70,7 @@ type Store interface {
 	GetDueReminders() ([]Reminder, error)
 	UpdateReminder(reminder Reminder) error
 	DeleteReminder(id string) error
+	DeleteOldReminders(ageLimit time.Duration) error
 
 	// General State
 	GetState(key string) (string, error)
@@ -345,6 +346,10 @@ func (vs *FileStore) UpdateReminder(reminder Reminder) error {
 }
 
 func (vs *FileStore) DeleteReminder(id string) error {
+	return nil
+}
+
+func (vs *FileStore) DeleteOldReminders(ageLimit time.Duration) error {
 	return nil
 }
 

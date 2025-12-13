@@ -355,7 +355,17 @@ func (s *SurrealStore) GetDueReminders() ([]Reminder, error) {
 			r := Reminder{}
 			if id, ok := rowMap["id"].(string); ok {
 				r.ID = id
+			} else if idMap, ok := rowMap["id"].(map[string]interface{}); ok {
+				// Handle RecordID object if returned as map
+				if strID, ok := idMap["String"].(string); ok {
+					r.ID = strID
+				}
+			} else {
+				// Fallback: try to print it if it's something else, or just ignore
+				// SurrealDB Go driver might return specific types for RecordID
+				r.ID = fmt.Sprintf("%v", rowMap["id"])
 			}
+
 			if uid, ok := rowMap["user_id"].(string); ok {
 				r.UserID = uid
 			}
@@ -399,6 +409,14 @@ func (s *SurrealStore) DeleteReminder(id string) error {
 	// id is typically "reminders:<uuid>"
 	query := `DELETE $id;`
 	_, err := s.client.Query(query, map[string]interface{}{"id": id})
+	return err
+}
+
+func (s *SurrealStore) DeleteOldReminders(ageLimit time.Duration) error {
+	// Delete reminders where due_at is older than (now - ageLimit)
+	cutoff := time.Now().Add(-ageLimit).Unix()
+	query := `DELETE reminders WHERE due_at < $cutoff;`
+	_, err := s.client.Query(query, map[string]interface{}{"cutoff": cutoff})
 	return err
 }
 

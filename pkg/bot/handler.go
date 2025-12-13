@@ -140,6 +140,7 @@ func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, m memory.Sto
 	go h.runDailyRoutine()
 	go h.checkReminders()
 	go h.runMoodLoop()
+	go h.cleanupLoop()
 
 	return h
 }
@@ -855,10 +856,11 @@ func (h *Handler) processReminder(r memory.Reminder) error {
 		}
 	}
 
-	prompt := fmt.Sprintf(`You are Marin Kitagawa. You remembered that %s had an event recently: "%s".
+	prompt := fmt.Sprintf(`You are Marin Kitagawa. You are reminding %s about: "%s".
 
-	Write a short, friendly message asking them how it went.
-	- Show you care.
+	Write a short, friendly, natural message.
+	- Don't say "I just remembered" or "You have an event".
+	- Just act like a friend checking in or reminding them.
 	- Be bubbly and supportive.
 	- Keep it casual.`, userName, r.Text)
 
@@ -929,6 +931,19 @@ func (h *Handler) evaluateReaction(s Session, channelID, messageID, content stri
 	if rand.Float64() < 0.5 {
 		if err := s.MessageReactionAdd(channelID, messageID, emoji); err != nil {
 			log.Printf("Error adding reaction: %v", err)
+		}
+	}
+}
+
+func (h *Handler) cleanupLoop() {
+	// Run cleanup every hour
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		// Delete reminders older than 24 hours
+		if err := h.memoryStore.DeleteOldReminders(24 * time.Hour); err != nil {
+			log.Printf("Error cleaning up old reminders: %v", err)
 		}
 	}
 }
