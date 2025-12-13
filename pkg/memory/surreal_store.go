@@ -86,31 +86,23 @@ func (s *SurrealStore) Init() error {
 // Emoji Cache
 
 func (s *SurrealStore) GetCachedEmojis(guildID string) ([]string, error) {
-	query := `SELECT emojis FROM type::thing("guild_cache", $guild_id);`
+	query := `SELECT emojis FROM guild_cache WHERE id = type::thing("guild_cache", $guild_id);`
 	result, err := s.client.Query(query, map[string]interface{}{"guild_id": guildID})
 	if err != nil {
 		return nil, err
 	}
 
-	resSlice, ok := result.([]interface{})
-	if !ok || len(resSlice) == 0 {
+	rows, ok := result.([]interface{})
+	if !ok || len(rows) == 0 {
 		return nil, nil // Not found is not an error
 	}
 
-	queryRes := resSlice[0]
 	var emojis []string
-
-	if resMap, ok := queryRes.(map[string]interface{}); ok {
-		if val, ok := resMap["result"]; ok {
-			if rows, ok := val.([]interface{}); ok && len(rows) > 0 {
-				if row, ok := rows[0].(map[string]interface{}); ok {
-					if e, ok := row["emojis"].([]interface{}); ok {
-						for _, item := range e {
-							if str, ok := item.(string); ok {
-								emojis = append(emojis, str)
-							}
-						}
-					}
+	if row, ok := rows[0].(map[string]interface{}); ok {
+		if e, ok := row["emojis"].([]interface{}); ok {
+			for _, item := range e {
+				if str, ok := item.(string); ok {
+					emojis = append(emojis, str)
 				}
 			}
 		}
@@ -414,7 +406,8 @@ func (s *SurrealStore) DeleteReminder(id string) error {
 
 func (s *SurrealStore) GetState(key string) (string, error) {
 	// key is used as the ID: bot_state:key
-	query := `SELECT value FROM type::thing("bot_state", $key);`
+	// Use SELECT * to avoid ambiguity with VALUE keyword
+	query := `SELECT * FROM bot_state WHERE id = type::thing("bot_state", $key);`
 	result, err := s.client.Query(query, map[string]interface{}{"key": key})
 	if err != nil {
 		return "", err
@@ -507,6 +500,7 @@ func (s *SurrealStore) DeleteUserData(userId string) error {
 		DELETE memories WHERE user_id = $user_id;
 		DELETE recent_messages WHERE user_id = $user_id;
 		DELETE user_profiles WHERE user_id = $user_id;
+		DELETE reminders WHERE user_id = $user_id;
 	`
 	_, err := s.client.Query(query, map[string]interface{}{"user_id": userId})
 	return err
@@ -518,7 +512,7 @@ func (s *SurrealStore) GetFacts(userId string) ([]string, error) {
 	// Direct record lookup: user_profiles:<userId>
 	// Note: In SurrealDB, record IDs are `table:id`. We assume userId is safe to use as ID part.
 	// If userId contains special chars, we might need to escape or hash it, but for Discord IDs (snowflakes) it's fine.
-	query := `SELECT facts FROM type::thing("user_profiles", $user_id);`
+	query := `SELECT facts FROM user_profiles WHERE id = type::thing("user_profiles", $user_id);`
 
 	result, err := s.client.Query(query, map[string]interface{}{"user_id": userId})
 	if err != nil {

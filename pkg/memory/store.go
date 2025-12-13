@@ -35,7 +35,7 @@ type RecentMessageItem struct {
 }
 
 type Reminder struct {
-	ID        string `json:"id"`
+	ID        string `json:"id,omitempty"`
 	UserID    string `json:"user_id"`
 	Text      string `json:"text"`
 	DueAt     int64  `json:"due_at"`
