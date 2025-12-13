@@ -63,6 +63,7 @@ type Store interface {
 
 	// Social Features
 	GetAllKnownUsers() ([]string, error)
+	GetActiveUsers(since int64) ([]string, error)
 	EnsureUser(userID string) error
 
 	// Reminders
@@ -326,6 +327,10 @@ func (vs *FileStore) SetCachedEmojis(guildID string, emojis []string) error {
 }
 
 func (vs *FileStore) GetAllKnownUsers() ([]string, error) {
+	return []string{}, nil
+}
+
+func (vs *FileStore) GetActiveUsers(since int64) ([]string, error) {
 	return []string{}, nil
 }
 

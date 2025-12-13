@@ -53,6 +53,7 @@ type mockMemoryStore struct {
 	SetCachedEmojisFunc         func(guildID string, emojis []string) error
 	GetCachedClassificationFunc func(text string, model string) (string, float64, error)
 	SetCachedClassificationFunc func(text string, model string, label string, score float64) error
+	GetActiveUsersFunc          func(since int64) ([]string, error)
 }
 
 func (m *mockMemoryStore) Add(userId string, text string, vector []float32) error {
@@ -147,6 +148,13 @@ func (m *mockMemoryStore) SetCachedClassification(text string, model string, lab
 }
 
 func (m *mockMemoryStore) GetAllKnownUsers() ([]string, error) {
+	return []string{}, nil
+}
+
+func (m *mockMemoryStore) GetActiveUsers(since int64) ([]string, error) {
+	if m.GetActiveUsersFunc != nil {
+		return m.GetActiveUsersFunc(since)
+	}
 	return []string{}, nil
 }
 

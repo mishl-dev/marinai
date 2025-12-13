@@ -26,7 +26,8 @@ func (ta *TaskAgent) CheckTask(userMsg string) (bool, string) {
 	// 1. Classify the message
 	labels := []string{
 		"chat message",
-		"requesting for long writing task",
+		"requesting for long writing task (essay, code, homework, work)",
+		"requesting for creative fun (poem, joke, roleplay)",
 	}
 
 	label, score, err := ta.classifierClient.Classify(userMsg, labels)
@@ -38,9 +39,10 @@ func (ta *TaskAgent) CheckTask(userMsg string) (bool, string) {
 
 	log.Printf("Task Classification: '%s' (score: %.2f)", label, score)
 
-	// Only refuse if it is explicitly a task request with high confidence
-	if label == "requesting for long writing task" && score >= 0.9 {
-		log.Printf("Detected long writing task (score: %.2f), generating refusal", score)
+	// Only refuse if it is explicitly a BORING task request with high confidence
+	// If it's creative/fun, we let it pass through to the main handler
+	if label == "requesting for long writing task (essay, code, homework, work)" && score >= 0.85 {
+		log.Printf("Detected boring task (score: %.2f), generating refusal", score)
 	} else {
 		return false, ""
 	}

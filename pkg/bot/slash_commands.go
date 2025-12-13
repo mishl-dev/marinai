@@ -12,11 +12,21 @@ var SlashCommands = []*discordgo.ApplicationCommand{
 		Name:        "reset",
 		Description: "Permanently delete all your conversation history and memories",
 	},
+	{
+		Name:        "memory",
+		Description: "View what Marin knows about you and current memory stats",
+	},
+	{
+		Name:        "resent",
+		Description: "Resend the last message Marin sent (useful if you accidentally deleted it)",
+	},
 }
 
 // SlashCommandHandlers maps command names to their handler functions
 var SlashCommandHandlers = map[string]func(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate){
-	"reset": handleResetCommand,
+	"reset":  handleResetCommand,
+	"memory": handleMemoryCommand,
+	"resent": handleResentCommand,
 }
 
 // handleResetCommand handles the /reset slash command
@@ -53,6 +63,75 @@ func handleResetCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 	if err != nil {
 		log.Printf("Error responding to reset command: %v", err)
 	}
+}
+
+func handleMemoryCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+	var userID string
+	if i.Member != nil {
+		userID = i.Member.User.ID
+	} else if i.User != nil {
+		userID = i.User.ID
+	} else {
+		return
+	}
+
+	// Fetch facts
+	facts, err := h.memoryStore.GetFacts(userID)
+	if err != nil {
+		log.Printf("Error getting facts: %v", err)
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{Content: "Error fetching memories.", Flags: discordgo.MessageFlagsEphemeral},
+		})
+		return
+	}
+
+	// Fetch reminders
+	// This is a bit inefficient as it gets all reminders then filters, but okay for now
+	// allReminders, err := h.memoryStore.GetDueReminders()
+	// Actually GetDueReminders only gets DUE ones. We might want ALL pending reminders for the user.
+	// But the interface doesn't support that yet.
+	// Let's just show facts for now.
+
+	content := "**🧠 Marin's Memory of You**\n\n"
+	if len(facts) == 0 {
+		content += "_I don't know much about you yet! Chat with me more so I can remember things._"
+	} else {
+		content += "**Facts:**\n"
+		for _, f := range facts {
+			content += "• " + f + "\n"
+		}
+	}
+
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: content,
+			Flags:   discordgo.MessageFlagsEphemeral,
+		},
+	})
+}
+
+func handleResentCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+	lastResponse := h.GetLastResponse(i.ChannelID)
+
+	if lastResponse == "" {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "I haven't said anything here recently to resend!",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: lastResponse,
+		},
+	})
 }
 
 // InteractionCreate handles all slash command interactions

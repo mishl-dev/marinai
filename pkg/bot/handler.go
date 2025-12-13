@@ -99,6 +99,10 @@ type Handler struct {
 	currentMood    string
 	messageCounter int
 	moodMu         sync.RWMutex
+
+	// Last Response Tracking (ChannelID -> Content)
+	lastResponses   map[string]string
+	lastResponsesMu sync.RWMutex
 }
 
 func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, m memory.Store, messageProcessingDelay float64, factAgingDays int, factSummarizationThreshold int, maintenanceIntervalHours float64) *Handler {
@@ -117,6 +121,7 @@ func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, m memory.Sto
 		activeUsers:                make(map[string]bool),
 		lastGlobalInteraction:      time.Now(), // Initialize with current time so she doesn't feel lonely immediately
 		currentMood:                "HAPPY",    // Default mood
+		lastResponses:              make(map[string]string),
 	}
 
 	// Validate maintenance interval to prevent panic
@@ -529,6 +534,11 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 		h.sendSplitMessage(s, m.ChannelID, "(I'm having a headache... try again later.)", m.Reference())
 		return
 	}
+
+	// Save last response for /resent command
+	h.lastResponsesMu.Lock()
+	h.lastResponses[m.ChannelID] = reply
+	h.lastResponsesMu.Unlock()
 
 	h.sendSplitMessage(s, m.ChannelID, reply, m.Reference())
 
@@ -1008,6 +1018,7 @@ func (h *Handler) runDailyRoutine() {
 		var statusType discordgo.ActivityType
 		var emoji string
 
+		// Base routine based on time
 		switch {
 		case hour >= 7 && hour < 8:
 			statusText = "Running late for school! 🍞"
@@ -1033,6 +1044,45 @@ func (h *Handler) runDailyRoutine() {
 			statusText = "Sleeping... 😴"
 			statusType = discordgo.ActivityTypeCustom
 			emoji = "😴"
+		}
+
+		// Mood Overrides (unless sleeping)
+		// We don't override sleep unless she is HYPER at night (which fits the character)
+		h.moodMu.RLock()
+		mood := h.currentMood
+		h.moodMu.RUnlock()
+
+		if mood == "HYPER" {
+			// Hyper mood overrides everything except maybe deep sleep, but Marin stays up late
+			hyperStatuses := []struct {
+				text  string
+				emoji string
+			}{
+				{"Singing Karaoke! 🎤", "🎤"},
+				{"Dancing around! 💃", "💃"},
+				{"Playing loud music! 🎵", "🎵"},
+				{"Planning next cosplay!! ✨", "✨"},
+			}
+			// Pick one based on minute to change it up
+			idx := time.Now().Minute() % len(hyperStatuses)
+			statusText = hyperStatuses[idx].text
+			statusType = discordgo.ActivityTypeCustom
+			emoji = hyperStatuses[idx].emoji
+		} else if mood == "BORED" && (hour >= 7 && hour < 23) {
+			// Bored mood only overrides awake times
+			boredStatuses := []struct {
+				text  string
+				emoji string
+			}{
+				{"Staring at the ceiling... 😑", "😑"},
+				{"Rolling on the floor... 🌀", "🌀"},
+				{"Sighing loudly... 💨", "💨"},
+				{"Need something to do... 🤔", "🤔"},
+			}
+			idx := time.Now().Minute() % len(boredStatuses)
+			statusText = boredStatuses[idx].text
+			statusType = discordgo.ActivityTypeCustom
+			emoji = boredStatuses[idx].emoji
 		}
 
 		err := h.session.UpdateStatusComplex(discordgo.UpdateStatusData{
@@ -1073,10 +1123,20 @@ func (h *Handler) performLonelinessCheck() bool {
 	}
 
 	// 3. Get candidates
-	users, err := h.memoryStore.GetAllKnownUsers()
+	// First try to find users who have been active in the last 7 days
+	since := time.Now().AddDate(0, 0, -7).Unix()
+	users, err := h.memoryStore.GetActiveUsers(since)
 	if err != nil {
-		log.Printf("Error getting known users: %v", err)
-		return false
+		log.Printf("Error getting active users: %v", err)
+	}
+
+	// If no active users, fall back to all known users
+	if len(users) == 0 {
+		users, err = h.memoryStore.GetAllKnownUsers()
+		if err != nil {
+			log.Printf("Error getting known users: %v", err)
+			return false
+		}
 	}
 
 	if len(users) == 0 {
@@ -1159,4 +1219,10 @@ Write a short, casual, friendly message to them to start a conversation.
 
 func (h *Handler) WaitForReady() {
 	h.wg.Wait()
+}
+
+func (h *Handler) GetLastResponse(channelID string) string {
+	h.lastResponsesMu.RLock()
+	defer h.lastResponsesMu.RUnlock()
+	return h.lastResponses[channelID]
 }

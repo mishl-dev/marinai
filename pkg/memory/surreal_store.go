@@ -536,6 +536,26 @@ func (s *SurrealStore) GetAllKnownUsers() ([]string, error) {
 	return []string{}, nil
 }
 
+func (s *SurrealStore) GetActiveUsers(since int64) ([]string, error) {
+	// Query user_profiles where last_updated > since
+	query := `SELECT VALUE user_id FROM user_profiles WHERE last_updated > $since;`
+	result, err := s.client.Query(query, map[string]interface{}{"since": since})
+	if err != nil {
+		return nil, err
+	}
+
+	if list, ok := result.([]interface{}); ok {
+		var users []string
+		for _, item := range list {
+			if str, ok := item.(string); ok {
+				users = append(users, str)
+			}
+		}
+		return users, nil
+	}
+	return []string{}, nil
+}
+
 func (s *SurrealStore) EnsureUser(userId string) error {
 	query := `
 		INSERT INTO user_profiles (id, user_id, facts, last_updated)
