@@ -102,10 +102,9 @@ Task: Analyze the interaction and output a JSON object with "add", "remove", and
 
 STRICT RULES FOR MEMORY:
 1. CONSERVATIVE: Bias towards returning empty lists. Only act if the information is explicitly stated and permanent.
-2. PERMANENT ONLY: Save facts like Name, Job, Location, Allergies, Relationships.
-3. IGNORE TEMPORARY: Do NOT save states like "I am hungry", "I am tired", "I am driving", or "I am busy".
-4. IGNORE TRIVIAL: Do NOT save weak preferences or small talk (e.g., "I like that joke").
-5. CONTRADICTIONS: If the user explicitly contradicts an item in 'Current Profile' (e.g., moved to a new city), add the new fact to 'add' and the old fact to 'remove'.
+2. IGNORE TEMPORARY: Do NOT save states like "I am hungry", "I am tired", "I am driving", or "I am busy".
+3. IGNORE TRIVIAL: Do NOT save weak preferences or small talk (e.g., "I like that joke").
+4. CONTRADICTIONS: If the user explicitly contradicts an item in 'Current Profile' (e.g., moved to a new city), add the new fact to 'add' and the old fact to 'remove'.
 
 RULES FOR REMINDERS:
 - If the user mentions a specific future event (exam, interview, trip) with a time frame, create a reminder.
@@ -118,7 +117,6 @@ Output ONLY valid JSON.`, currentProfile, currentTimeStr, userName, userMessage,
 	messages := []cerebras.Message{
 		{
 			Role: "system",
-			// System Prompt: Sets the persona to be strict and lazy (avoids false positives)
 			Content: `You are a strict Database Administrator responsible for long-term user records and scheduling.
 Your goal is to keep the database clean and concise.
 Reject all trivial information.
