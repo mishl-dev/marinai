@@ -6,6 +6,7 @@ import (
 	"log"
 	"marinai/pkg/surreal"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -425,9 +426,24 @@ func (s *SurrealStore) UpdateReminder(reminder Reminder) error {
 }
 
 func (s *SurrealStore) DeleteReminder(id string) error {
-	// id is typically "reminders:<uuid>"
-	query := `DELETE $id;`
-	_, err := s.client.Query(query, map[string]interface{}{"id": id})
+	// id is typically "reminders:<uuid>" or just "<uuid>"
+	// We need to use type::thing() to ensure it's treated as a record ID
+	var tb, key string
+
+	if strings.Contains(id, ":") {
+		parts := strings.SplitN(id, ":", 2)
+		tb = parts[0]
+		key = parts[1]
+	} else {
+		tb = "reminders"
+		key = id
+	}
+
+	query := `DELETE type::thing($tb, $key);`
+	_, err := s.client.Query(query, map[string]interface{}{
+		"tb":  tb,
+		"key": key,
+	})
 	return err
 }
 
