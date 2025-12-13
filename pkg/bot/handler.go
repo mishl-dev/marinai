@@ -270,9 +270,6 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	// Always reply in DMs, otherwise use decision logic
 	shouldReply := isMentioned || isDM
 
-	// Get recent context (Rolling Chat Context)
-	recentMsgs := h.getRecentMessages(m.Author.ID)
-
 	if !shouldReply {
 		// Use Classifier to decide if Marin should respond based on her personality
 		labels := []string{
@@ -328,26 +325,89 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	// 1. Generate Embedding for current message
-	// We use the user's message as the query for retrieval
-	emb, err := h.embeddingClient.Embed(m.Content)
-	if err != nil {
-		log.Printf("Error generating embedding: %v", err)
-	}
+	// Parallelize data gathering to reduce latency
+	var (
+		recentMsgs []memory.RecentMessageItem
+		matches    []string
+		facts      []string
+		emojiText  string
+	)
+
+	var gatherWg sync.WaitGroup
+	gatherWg.Add(4)
+
+	// 1. Recent Context
+	go func() {
+		defer gatherWg.Done()
+		recentMsgs = h.getRecentMessages(m.Author.ID)
+	}()
 
 	// 2. Search Memory (RAG)
-	var retrievedMemories string
-	if emb != nil {
-		matches, err := h.memoryStore.Search(m.Author.ID, emb, 5) // Top 5 relevant memories
+	go func() {
+		defer gatherWg.Done()
+		// Generate Embedding for current message
+		emb, err := h.embeddingClient.Embed(m.Content)
 		if err != nil {
-			log.Printf("Error searching memory: %v", err)
-		} else if len(matches) > 0 {
-			retrievedMemories = "Relevant past memories:\n- " + strings.Join(matches, "\n- ")
+			log.Printf("Error generating embedding: %v", err)
+			return
 		}
+		if emb != nil {
+			var err error
+			matches, err = h.memoryStore.Search(m.Author.ID, emb, 5) // Top 5 relevant memories
+			if err != nil {
+				log.Printf("Error searching memory: %v", err)
+			}
+		}
+	}()
+
+	// 3. Emojis
+	go func() {
+		defer gatherWg.Done()
+		if channel != nil && channel.GuildID != "" {
+			emojis, err := s.GuildEmojis(channel.GuildID)
+			if err == nil && len(emojis) > 0 {
+				relevantNames := h.filterRelevantEmojis(channel.GuildID, emojis)
+
+				if len(relevantNames) > 0 {
+					nameToEmoji := make(map[string]*discordgo.Emoji)
+					for _, emoji := range emojis {
+						nameToEmoji[emoji.Name] = emoji
+					}
+
+					var emojiList []string
+					for _, name := range relevantNames {
+						if emoji, ok := nameToEmoji[name]; ok {
+							emojiList = append(emojiList, fmt.Sprintf("<:%s:%s>", emoji.Name, emoji.ID))
+						}
+					}
+
+					if len(emojiList) > 0 {
+						emojiText = "Available custom emojis:\n" + strings.Join(emojiList, ", ")
+					}
+				}
+			}
+		}
+	}()
+
+	// 4. Fetch User Profile
+	go func() {
+		defer gatherWg.Done()
+		var err error
+		facts, err = h.memoryStore.GetFacts(m.Author.ID)
+		if err != nil {
+			log.Printf("Error fetching user profile: %v", err)
+		}
+	}()
+
+	// Wait for all data
+	gatherWg.Wait()
+
+	// Prepare strings from gathered data
+	var retrievedMemories string
+	if len(matches) > 0 {
+		retrievedMemories = "Relevant past memories:\n- " + strings.Join(matches, "\n- ")
 	}
 
-	// 3. Prepare Context (Rolling Window)
-	// We already fetched recentMsgs above.
 	var rollingContext string
 	if len(recentMsgs) > 0 {
 		var contextLines []string
@@ -370,44 +430,6 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 		rollingContext = "Recent conversation:\n" + strings.Join(contextLines, "\n")
 	}
 
-	// 4. Prepare Emojis
-	var emojiText string
-	if channel != nil && channel.GuildID != "" {
-		emojis, err := s.GuildEmojis(channel.GuildID)
-		if err == nil && len(emojis) > 0 {
-			relevantNames := h.filterRelevantEmojis(channel.GuildID, emojis)
-
-			if len(relevantNames) > 0 {
-				nameToEmoji := make(map[string]*discordgo.Emoji)
-				for _, emoji := range emojis {
-					nameToEmoji[emoji.Name] = emoji
-				}
-
-				var emojiList []string
-				for _, name := range relevantNames {
-					if emoji, ok := nameToEmoji[name]; ok {
-						emojiList = append(emojiList, fmt.Sprintf("<:%s:%s>", emoji.Name, emoji.ID))
-					}
-				}
-
-				if len(emojiList) > 0 {
-					emojiText = "Available custom emojis:\n" + strings.Join(emojiList, ", ")
-				}
-			}
-		}
-	}
-
-	// 5. Construct Prompt
-	// [System Prompt]
-	// [Retrieved Memories]
-	// [Rolling Chat Context]
-	// [Current User Message] (handled by appending as user message)
-
-	// Fetch User Profile
-	facts, err := h.memoryStore.GetFacts(m.Author.ID)
-	if err != nil {
-		log.Printf("Error fetching user profile: %v", err)
-	}
 	profileText := "No known facts yet."
 	if len(facts) > 0 {
 		profileText = "- " + strings.Join(facts, "\n- ")
