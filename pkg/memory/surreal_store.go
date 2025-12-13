@@ -56,7 +56,7 @@ func (s *SurrealStore) Init() error {
 		DEFINE FIELD IF NOT EXISTS facts[*].text ON user_profiles TYPE string;
 		DEFINE FIELD IF NOT EXISTS facts[*].created_at ON user_profiles TYPE int;
 		DEFINE FIELD IF NOT EXISTS last_updated ON user_profiles TYPE int;
-		DEFINE FIELD IF NOT EXISTS last_interaction ON user_profiles TYPE int;
+		DEFINE FIELD IF NOT EXISTS last_interaction ON user_profiles TYPE option<int>;
 
 	// Define schema for guild cache (emojis)
 		DEFINE TABLE IF NOT EXISTS guild_cache SCHEMAFULL;
@@ -544,8 +544,8 @@ func (s *SurrealStore) GetAllKnownUsers() ([]string, error) {
 
 func (s *SurrealStore) EnsureUser(userId string) error {
 	query := `
-		INSERT INTO user_profiles (id, user_id, facts, last_updated)
-		VALUES (type::thing("user_profiles", $user_id), $user_id, [], time::unix())
+		INSERT INTO user_profiles (id, user_id, facts, last_updated, last_interaction)
+		VALUES (type::thing("user_profiles", $user_id), $user_id, [], time::unix(), 0)
 		ON DUPLICATE KEY UPDATE last_updated = time::unix();
 	`
 	_, err := s.client.Query(query, map[string]interface{}{
@@ -647,8 +647,8 @@ func (s *SurrealStore) ApplyDelta(userId string, adds []string, removes []string
 	// This is safe here because we are marshalling structs/slices we control, but in general be careful with injection
 	query := fmt.Sprintf(`
 		-- Ensure record exists
-		INSERT INTO user_profiles (id, user_id, facts, last_updated) 
-		VALUES (type::thing("user_profiles", $user_id), $user_id, [], time::unix()) 
+		INSERT INTO user_profiles (id, user_id, facts, last_updated, last_interaction) 
+		VALUES (type::thing("user_profiles", $user_id), $user_id, [], time::unix(), 0) 
 		ON DUPLICATE KEY UPDATE last_updated = time::unix();
 
 		-- Remove facts by text
