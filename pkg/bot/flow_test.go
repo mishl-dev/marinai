@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"marinai/pkg/cerebras"
 	"marinai/pkg/memory"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Mock Cerebras Client
@@ -164,6 +167,10 @@ func (m *mockMemoryStore) UpdateReminder(reminder memory.Reminder) error {
 }
 
 func (m *mockMemoryStore) DeleteReminder(id string) error {
+	return nil
+}
+
+func (m *mockMemoryStore) DeleteOldReminders(ageLimit time.Duration) error {
 	return nil
 }
 
@@ -363,30 +370,16 @@ func TestMessageFlow(t *testing.T) {
 		handler.WaitForReady()
 
 		// Assert
-		if !searchCalled {
-			t.Error("Expected Search to be called on memory store, but it wasn't")
-		}
-		if !getRecentMessagesCalled {
-			t.Error("Expected GetRecentMessages to be called on memory store, but it wasn't")
-		}
-		if !strings.Contains(strings.ToLower(finalPrompt), "[system]") {
-			t.Error("Final prompt does not contain the System Prompt")
-		}
-		if !strings.Contains(finalPrompt, "retrieved memory") {
-			t.Error("Final prompt does not contain the Retrieved Memories")
-		}
-		if !strings.Contains(finalPrompt, "rolling context") {
-			t.Error("Final prompt does not contain the Rolling Chat Context")
-		}
-		if !strings.Contains(finalPrompt, "Hello, this is a user message.") {
-			t.Error("Final prompt does not contain the Current User Message")
-		}
-		if addRecentMessageCalls != 2 {
-			t.Errorf("Expected AddRecentMessage to be called twice, but it was called %d times", addRecentMessageCalls)
-		}
-		if applyDeltaCalled {
-			t.Error("Expected ApplyDelta not to be called for standard message, but it was")
-		}
+		assert.True(t, searchCalled, "Expected Search to be called on memory store")
+		assert.True(t, getRecentMessagesCalled, "Expected GetRecentMessages to be called on memory store")
+
+		assert.Contains(t, strings.ToLower(finalPrompt), "[system]", "Final prompt should contain the System Prompt")
+		assert.Contains(t, finalPrompt, "retrieved memory", "Final prompt should contain the Retrieved Memories")
+		assert.Contains(t, finalPrompt, "rolling context", "Final prompt should contain the Rolling Chat Context")
+		assert.Contains(t, finalPrompt, "Hello, this is a user message.", "Final prompt should contain the Current User Message")
+
+		assert.Equal(t, 2, addRecentMessageCalls, "Expected AddRecentMessage to be called exactly twice")
+		assert.False(t, applyDeltaCalled, "Expected ApplyDelta NOT to be called for standard message")
 	})
 
 	// Test Case 2: Memorable message
@@ -411,9 +404,7 @@ func TestMessageFlow(t *testing.T) {
 		handler.WaitForReady()
 
 		// Assert
-		if !applyDeltaCalled {
-			t.Error("Expected ApplyDelta to be called, but it wasn't")
-		}
+		assert.True(t, applyDeltaCalled, "Expected ApplyDelta to be called")
 	})
 
 	// Test Case 3: Memory with quotes
@@ -435,12 +426,10 @@ func TestMessageFlow(t *testing.T) {
 		handler.WaitForReady()
 
 		// Assert
-		if !applyDeltaCalled {
-			t.Error("Expected ApplyDelta to be called, but it wasn't")
-		}
+		require.True(t, applyDeltaCalled, "Expected ApplyDelta to be called")
+
 		expectedMemory := "User loves to code"
-		if len(addedFacts) == 0 || addedFacts[0] != expectedMemory {
-			t.Errorf("Expected memory to be '%s', but got '%v'", expectedMemory, addedFacts)
-		}
+		require.NotEmpty(t, addedFacts, "Expected addedFacts not to be empty")
+		assert.Equal(t, expectedMemory, addedFacts[0], "Memory mismatch")
 	})
 }

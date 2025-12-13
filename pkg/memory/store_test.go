@@ -3,14 +3,15 @@ package memory
 import (
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFileStore(t *testing.T) {
 	// Setup temporary directory
 	tmpDir, err := os.MkdirTemp("", "marinai_store_test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
+	require.NoError(t, err, "Failed to create temp dir")
 	defer os.RemoveAll(tmpDir)
 
 	store := NewFileStore(tmpDir)
@@ -18,91 +19,54 @@ func TestFileStore(t *testing.T) {
 
 	// Test Add
 	err = store.Add(userId, "Hello world", []float32{1.0, 0.0, 0.0})
-	if err != nil {
-		t.Errorf("Failed to add item: %v", err)
-	}
+	assert.NoError(t, err, "Failed to add item")
 
 	err = store.Add(userId, "Pizza is good", []float32{0.0, 1.0, 0.0})
-	if err != nil {
-		t.Errorf("Failed to add second item: %v", err)
-	}
+	assert.NoError(t, err, "Failed to add second item")
 
 	// Test Search (Exact match)
 	results, err := store.Search(userId, []float32{1.0, 0.0, 0.0}, 1)
-	if err != nil {
-		t.Errorf("Failed to search: %v", err)
-	}
-	if len(results) != 1 {
-		t.Errorf("Expected 1 result, got %d", len(results))
-	}
-	if results[0] != "Hello world" {
-		t.Errorf("Expected 'Hello world', got '%s'", results[0])
-	}
+	assert.NoError(t, err, "Failed to search")
+	require.Len(t, results, 1, "Expected 1 result")
+	assert.Equal(t, "Hello world", results[0], "Expected 'Hello world'")
 
 	// Test Search (Similarity)
 	// Vector {0.1, 0.9, 0.0} should be closer to {0.0, 1.0, 0.0} than {1.0, 0.0, 0.0}
 	results, err = store.Search(userId, []float32{0.1, 0.9, 0.0}, 1)
-	if err != nil {
-		t.Errorf("Failed to search: %v", err)
-	}
-	if len(results) != 1 {
-		t.Errorf("Expected 1 result, got %d", len(results))
-	}
-	if results[0] != "Pizza is good" {
-		t.Errorf("Expected 'Pizza is good', got '%s'", results[0])
-	}
+	assert.NoError(t, err, "Failed to search")
+	require.Len(t, results, 1, "Expected 1 result")
+	assert.Equal(t, "Pizza is good", results[0], "Expected 'Pizza is good'")
 
 	// Test Recent Messages
 	err = store.AddRecentMessage(userId, "user", "Test message 1")
-	if err != nil {
-		t.Errorf("Failed to add recent message: %v", err)
-	}
+	assert.NoError(t, err, "Failed to add recent message")
 
 	err = store.AddRecentMessage(userId, "assistant", "Test message 2")
-	if err != nil {
-		t.Errorf("Failed to add second recent message: %v", err)
-	}
+	assert.NoError(t, err, "Failed to add second recent message")
 
 	recent, err := store.GetRecentMessages(userId)
-	if err != nil {
-		t.Errorf("Failed to get recent messages: %v", err)
-	}
-	if len(recent) != 2 {
-		t.Errorf("Expected 2 recent messages, got %d", len(recent))
-	}
+	assert.NoError(t, err, "Failed to get recent messages")
+	require.Len(t, recent, 2, "Expected 2 recent messages")
 	if len(recent) > 0 {
-		if recent[0].Text != "Test message 1" || recent[0].Role != "user" {
-			t.Errorf("Unexpected first message: %+v", recent[0])
-		}
+		assert.Equal(t, "Test message 1", recent[0].Text, "Unexpected first message text")
+		assert.Equal(t, "user", recent[0].Role, "Unexpected first message role")
 	}
 
 	// Test Clear Recent Messages
 	err = store.ClearRecentMessages(userId)
-	if err != nil {
-		t.Errorf("Failed to clear recent messages: %v", err)
-	}
+	assert.NoError(t, err, "Failed to clear recent messages")
 
 	recent, err = store.GetRecentMessages(userId)
-	if err != nil {
-		t.Errorf("Failed to get recent messages after clear: %v", err)
-	}
-	if len(recent) != 0 {
-		t.Errorf("Expected 0 recent messages after clear, got %d", len(recent))
-	}
+	assert.NoError(t, err, "Failed to get recent messages after clear")
+	assert.Empty(t, recent, "Expected 0 recent messages after clear")
 
 	// Test Delete User Data
 	err = store.DeleteUserData(userId)
-	if err != nil {
-		t.Errorf("Failed to delete user data: %v", err)
-	}
+	assert.NoError(t, err, "Failed to delete user data")
 
 	results, err = store.Search(userId, []float32{1.0, 0.0, 0.0}, 1)
-	if err != nil {
-		t.Errorf("Failed to search after delete: %v", err)
-	}
-	if len(results) != 0 {
-		t.Errorf("Expected 0 results after delete, got %d", len(results))
-	}
+	assert.NoError(t, err, "Failed to search after delete")
+	assert.Empty(t, results, "Expected 0 results after delete")
 }
 
 func TestCosineSimilarity(t *testing.T) {
@@ -135,10 +99,7 @@ func TestCosineSimilarity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := cosineSimilarity(tt.a, tt.b)
-			// Allow small float error
-			if got < tt.want-0.0001 || got > tt.want+0.0001 {
-				t.Errorf("cosineSimilarity() = %v, want %v", got, tt.want)
-			}
+			assert.InDelta(t, tt.want, got, 0.0001, "cosineSimilarity()")
 		})
 	}
 }

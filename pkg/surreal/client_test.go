@@ -2,6 +2,8 @@ package surreal
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Accessing private function for testing
@@ -24,8 +26,11 @@ func TestValidateIdentifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateIdentifier(tt.input); (err != nil) != tt.wantErr {
-				t.Errorf("validateIdentifier() error = %v, wantErr %v", err, tt.wantErr)
+			err := validateIdentifier(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err, "Expected error for input: %s", tt.input)
+			} else {
+				assert.NoError(t, err, "Expected no error for input: %s", tt.input)
 			}
 		})
 	}
@@ -67,12 +72,11 @@ func TestBuildWhereClause(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := buildWhereClause(tt.filter)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("buildWhereClause() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && got != tt.want {
-				t.Errorf("buildWhereClause() = %v, want %v", got, tt.want)
+			if tt.wantErr {
+				assert.Error(t, err, "Expected error for filter: %v", tt.filter)
+			} else {
+				assert.NoError(t, err, "Expected no error for filter: %v", tt.filter)
+				assert.Equal(t, tt.want, got, "Expected query mismatch")
 			}
 		})
 	}
