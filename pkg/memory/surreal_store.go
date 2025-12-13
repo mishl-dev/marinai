@@ -66,6 +66,13 @@ func (s *SurrealStore) Init() error {
 		DEFINE FIELD IF NOT EXISTS role ON recent_messages TYPE string;
 		DEFINE FIELD IF NOT EXISTS text ON recent_messages TYPE string;
 		DEFINE FIELD IF NOT EXISTS timestamp ON recent_messages TYPE int;
+
+	// Define schema for reminders
+		DEFINE TABLE IF NOT EXISTS reminders SCHEMAFULL;
+		DEFINE FIELD IF NOT EXISTS user_id ON reminders TYPE string;
+		DEFINE FIELD IF NOT EXISTS text ON reminders TYPE string;
+		DEFINE FIELD IF NOT EXISTS due_at ON reminders TYPE int;
+		DEFINE FIELD IF NOT EXISTS created_at ON reminders TYPE int;
 	`
 	_, err := s.client.Query(query, map[string]interface{}{})
 	return err
@@ -314,27 +321,132 @@ func (s *SurrealStore) ClearRecentMessages(userId string) error {
 	return err
 }
 
-func (s *SurrealStore) GetAllKnownUsers() ([]string, error) {
-	query := `SELECT user_id FROM user_profiles;`
-	result, err := s.client.Query(query, map[string]interface{}{})
+// Reminders
+
+func (s *SurrealStore) AddReminder(userId string, text string, dueAt int64) error {
+	reminder := Reminder{
+		UserID:    userId,
+		Text:      text,
+		DueAt:     dueAt,
+		CreatedAt: time.Now().Unix(),
+	}
+
+	_, err := s.client.Create("reminders", reminder)
+	return err
+}
+
+func (s *SurrealStore) GetDueReminders() ([]Reminder, error) {
+	// Select reminders where due_at is less than current time
+	query := `
+		SELECT * FROM reminders WHERE due_at <= $now;
+	`
+	result, err := s.client.Query(query, map[string]interface{}{
+		"now": time.Now().Unix(),
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	rows, ok := result.([]interface{})
 	if !ok {
-		return []string{}, nil
+		return []Reminder{}, nil
 	}
 
-	var users []string
+	var reminders []Reminder
 	for _, row := range rows {
 		if rowMap, ok := row.(map[string]interface{}); ok {
-			if userID, ok := rowMap["user_id"].(string); ok {
-				users = append(users, userID)
+			r := Reminder{}
+			if id, ok := rowMap["id"].(string); ok {
+				r.ID = id
 			}
+			if uid, ok := rowMap["user_id"].(string); ok {
+				r.UserID = uid
+			}
+			if txt, ok := rowMap["text"].(string); ok {
+				r.Text = txt
+			}
+
+			// Handle numbers which might come as float64
+			if due, ok := rowMap["due_at"].(float64); ok {
+				r.DueAt = int64(due)
+			} else if due, ok := rowMap["due_at"].(int64); ok {
+				r.DueAt = due
+			}
+
+			if created, ok := rowMap["created_at"].(float64); ok {
+				r.CreatedAt = int64(created)
+			} else if created, ok := rowMap["created_at"].(int64); ok {
+				r.CreatedAt = created
+			}
+
+			reminders = append(reminders, r)
 		}
 	}
-	return users, nil
+	return reminders, nil
+}
+
+func (s *SurrealStore) UpdateReminder(reminder Reminder) error {
+	query := `
+		UPDATE $id SET text = $text, due_at = $due_at, user_id = $user_id;
+	`
+	_, err := s.client.Query(query, map[string]interface{}{
+		"id":      reminder.ID,
+		"text":    reminder.Text,
+		"due_at":  reminder.DueAt,
+		"user_id": reminder.UserID,
+	})
+	return err
+}
+
+func (s *SurrealStore) DeleteReminder(id string) error {
+	// id is typically "reminders:<uuid>"
+	query := `DELETE $id;`
+	_, err := s.client.Query(query, map[string]interface{}{"id": id})
+	return err
+}
+
+func (s *SurrealStore) GetAllKnownUsers() ([]string, error) {
+	// Query both user_profiles and memories to ensure we find all known users
+	// Use array::distinct to remove duplicates
+	query := `
+		LET $u1 = SELECT VALUE user_id FROM user_profiles;
+		LET $u2 = SELECT VALUE user_id FROM memories;
+		RETURN array::distinct(array::union($u1, $u2));
+	`
+	result, err := s.client.Query(query, map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Unwrap result: Query returns []interface{}, where first element is the result of RETURN
+	// Since we used multiple statements, the result might be wrapped differently depending on client
+	// But `Query` helper tries to unwrap "Result" field.
+	// In multi-statement query, the result is typically the result of the LAST statement.
+
+	// If result is []interface{}, and we used RETURN, it should be the array of user IDs directly or wrapped.
+	// Let's inspect typical structure.
+
+	// Assuming s.client.Query returns the "Result" of the last query.
+	// If result is []interface{}, it might be the rows.
+	// But here we return an ARRAY of strings.
+
+	// If result is []string, that's great.
+	if strList, ok := result.([]string); ok {
+		return strList, nil
+	}
+
+	// If result is []interface{} (generic list)
+	if list, ok := result.([]interface{}); ok {
+		var users []string
+		for _, item := range list {
+			if str, ok := item.(string); ok {
+				users = append(users, str)
+			}
+		}
+		return users, nil
+	}
+
+	return []string{}, nil
 }
 
 func (s *SurrealStore) DeleteUserData(userId string) error {

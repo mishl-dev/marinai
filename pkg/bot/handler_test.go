@@ -78,6 +78,14 @@ func (m *MockSession) UserChannelCreate(recipientID string, options ...discordgo
 	return &discordgo.Channel{ID: "dm_channel"}, nil
 }
 
+func (m *MockSession) MessageReactionAdd(channelID, messageID, emojiID string) error {
+	return nil
+}
+
+func (m *MockSession) UpdateStatusComplex(usd discordgo.UpdateStatusData) error {
+	return nil
+}
+
 type MockClassifier struct{}
 
 func (m *MockClassifier) Classify(text string, labels []string) (string, float64, error) {

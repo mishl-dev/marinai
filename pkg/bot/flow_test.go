@@ -147,6 +147,22 @@ func (m *mockMemoryStore) GetAllKnownUsers() ([]string, error) {
 	return []string{}, nil
 }
 
+func (m *mockMemoryStore) AddReminder(userId string, text string, dueAt int64) error {
+	return nil
+}
+
+func (m *mockMemoryStore) GetDueReminders() ([]memory.Reminder, error) {
+	return []memory.Reminder{}, nil
+}
+
+func (m *mockMemoryStore) UpdateReminder(reminder memory.Reminder) error {
+	return nil
+}
+
+func (m *mockMemoryStore) DeleteReminder(id string) error {
+	return nil
+}
+
 // Mock Discord Session
 type mockDiscordSession struct {
 	ChannelMessageSendFunc        func(channelID string, content string, options ...discordgo.RequestOption) (*discordgo.Message, error)
@@ -209,6 +225,14 @@ func (m *mockDiscordSession) GuildEmojis(guildID string, options ...discordgo.Re
 
 func (m *mockDiscordSession) UserChannelCreate(recipientID string, options ...discordgo.RequestOption) (*discordgo.Channel, error) {
 	return &discordgo.Channel{ID: "dm_channel"}, nil
+}
+
+func (m *mockDiscordSession) MessageReactionAdd(channelID, messageID, emojiID string) error {
+	return nil
+}
+
+func (m *mockDiscordSession) UpdateStatusComplex(usd discordgo.UpdateStatusData) error {
+	return nil
 }
 
 func TestMessageFlow(t *testing.T) {
