@@ -298,6 +298,12 @@ func TestSurrealStore_State(t *testing.T) {
 	defer cleanup()
 
 	key := "test_state_key"
+	// Ensure cleanup of state
+	defer func() {
+		query := `DELETE type::thing("bot_state", $key);`
+		_, _ = store.client.Query(query, map[string]interface{}{"key": key})
+	}()
+
 	value := "happy"
 
 	// Set state
@@ -372,11 +378,9 @@ func TestSurrealStore_Reminders(t *testing.T) {
 	defer cleanup()
 
 	userID := "test_user_reminders"
-	// Clean up old reminders for this user?
-	// The DB might contain reminders from previous failed runs.
-	// Since we don't have DeleteAllRemindersForUser, we have to rely on unique text or IDs,
-	// or just accept we are adding to the pile.
-	// But we can filter by checking if the ones we added are returned.
+	// Clean up before and after
+	_ = store.DeleteUserData(userID)
+	defer func() { _ = store.DeleteUserData(userID) }()
 
 	// Case 1: Add a reminder due in the past
 	pastDue := time.Now().Add(-1 * time.Hour).Unix()
@@ -434,6 +438,12 @@ func TestSurrealStore_EmojiCache(t *testing.T) {
 	defer cleanup()
 
 	guildID := "test_guild_123"
+	// Ensure cleanup
+	defer func() {
+		query := `DELETE type::thing("guild_cache", $id);`
+		_, _ = store.client.Query(query, map[string]interface{}{"id": guildID})
+	}()
+
 	emojis := []string{"😀", "🚀", "🎉"}
 
 	// Set emojis

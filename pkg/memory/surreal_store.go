@@ -500,6 +500,7 @@ func (s *SurrealStore) DeleteUserData(userId string) error {
 		DELETE memories WHERE user_id = $user_id;
 		DELETE recent_messages WHERE user_id = $user_id;
 		DELETE user_profiles WHERE user_id = $user_id;
+		DELETE reminders WHERE user_id = $user_id;
 	`
 	_, err := s.client.Query(query, map[string]interface{}{"user_id": userId})
 	return err
