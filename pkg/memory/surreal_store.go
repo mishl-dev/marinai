@@ -56,6 +56,7 @@ func (s *SurrealStore) Init() error {
 		DEFINE FIELD IF NOT EXISTS facts[*].text ON user_profiles TYPE string;
 		DEFINE FIELD IF NOT EXISTS facts[*].created_at ON user_profiles TYPE int;
 		DEFINE FIELD IF NOT EXISTS last_updated ON user_profiles TYPE int;
+		DEFINE FIELD IF NOT EXISTS last_interaction ON user_profiles TYPE int;
 
 	// Define schema for guild cache (emojis)
 		DEFINE TABLE IF NOT EXISTS guild_cache SCHEMAFULL;
@@ -80,6 +81,11 @@ func (s *SurrealStore) Init() error {
 		DEFINE TABLE IF NOT EXISTS bot_state SCHEMAFULL;
 		DEFINE FIELD IF NOT EXISTS value ON bot_state TYPE string;
 		DEFINE FIELD IF NOT EXISTS updated_at ON bot_state TYPE int;
+
+	// Define schema for pending DMs (Duolingo-style tracking)
+		DEFINE TABLE IF NOT EXISTS pending_dm SCHEMAFULL;
+		DEFINE FIELD IF NOT EXISTS user_id ON pending_dm TYPE string;
+		DEFINE FIELD IF NOT EXISTS sent_at ON pending_dm TYPE int;
 	`
 	_, err := s.client.Query(query, map[string]interface{}{})
 	return err
@@ -669,3 +675,90 @@ func (s *SurrealStore) DeleteFacts(userId string) error {
 	_, err := s.client.Query(query, map[string]interface{}{"user_id": userId})
 	return err
 }
+
+// Pending DM tracking (Duolingo-style)
+
+// HasPendingDM checks if the user has an unanswered boredom DM
+func (s *SurrealStore) HasPendingDM(userID string) (bool, error) {
+	query := `SELECT * FROM pending_dm WHERE id = type::thing("pending_dm", $user_id);`
+	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
+	if err != nil {
+		return false, err
+	}
+
+	rows, ok := result.([]interface{})
+	if !ok || len(rows) == 0 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// SetPendingDM marks that a boredom DM was sent and is awaiting response
+func (s *SurrealStore) SetPendingDM(userID string, sentAt time.Time) error {
+	query := `
+		INSERT INTO pending_dm (id, user_id, sent_at)
+		VALUES (type::thing("pending_dm", $user_id), $user_id, $sent_at)
+		ON DUPLICATE KEY UPDATE sent_at = $sent_at;
+	`
+	_, err := s.client.Query(query, map[string]interface{}{
+		"user_id": userID,
+		"sent_at": sentAt.Unix(),
+	})
+	return err
+}
+
+// ClearPendingDM removes the pending DM flag (user responded)
+func (s *SurrealStore) ClearPendingDM(userID string) error {
+	query := `DELETE type::thing("pending_dm", $user_id);`
+	_, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
+	return err
+}
+
+// GetLastInteraction returns when the user last interacted with the bot
+func (s *SurrealStore) GetLastInteraction(userID string) (time.Time, error) {
+	query := `SELECT last_interaction FROM user_profiles WHERE id = type::thing("user_profiles", $user_id);`
+	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	rows, ok := result.([]interface{})
+	if !ok || len(rows) == 0 {
+		return time.Time{}, nil // No record = never interacted
+	}
+
+	if row, ok := rows[0].(map[string]interface{}); ok {
+		var timestamp int64
+		switch t := row["last_interaction"].(type) {
+		case float64:
+			timestamp = int64(t)
+		case int64:
+			timestamp = t
+		case int:
+			timestamp = int64(t)
+		case nil:
+			return time.Time{}, nil // Field is nil = never set
+		}
+		if timestamp > 0 {
+			return time.Unix(timestamp, 0), nil
+		}
+	}
+
+	return time.Time{}, nil
+}
+
+// SetLastInteraction updates the user's last interaction timestamp
+func (s *SurrealStore) SetLastInteraction(userID string, timestamp time.Time) error {
+	query := `
+		INSERT INTO user_profiles (id, user_id, facts, last_updated, last_interaction)
+		VALUES (type::thing("user_profiles", $user_id), $user_id, [], time::unix(), $timestamp)
+		ON DUPLICATE KEY UPDATE last_interaction = $timestamp, last_updated = time::unix();
+	`
+	_, err := s.client.Query(query, map[string]interface{}{
+		"user_id":   userID,
+		"timestamp": timestamp.Unix(),
+	})
+	return err
+}
+

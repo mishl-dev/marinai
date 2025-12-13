@@ -303,6 +303,19 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	channel, err := s.Channel(m.ChannelID)
 	isDM := err == nil && channel.Type == discordgo.ChannelTypeDM
 
+	// Clear any pending boredom DM since the user is now responding (Duolingo-style)
+	// This makes them eligible for future boredom DMs
+	if isDM {
+		if err := h.memoryStore.ClearPendingDM(m.Author.ID); err != nil {
+			log.Printf("Error clearing pending DM for %s: %v", m.Author.ID, err)
+		}
+	}
+
+	// Update last interaction time in DB (for per-user boredom DM tracking)
+	if err := h.memoryStore.SetLastInteraction(m.Author.ID, time.Now()); err != nil {
+		log.Printf("Error updating last interaction for %s: %v", m.Author.ID, err)
+	}
+
 	// Check if mentioned
 	isMentioned := false
 	for _, user := range m.Mentions {
@@ -1054,11 +1067,14 @@ func (h *Handler) runDailyRoutine() {
 }
 
 // performLonelinessCheck is separated for testing
+// Uses Duolingo-style logic: won't DM a user if they haven't responded to the last one
 func (h *Handler) performLonelinessCheck() bool {
-	// Loneliness threshold: 4 hours of no interaction
+	// Per-user inactivity threshold: 2 days without interaction
+	const inactivityThreshold = 48 * time.Hour
+	// Global loneliness threshold: only check when globally lonely (no interaction for 4 hours)
 	const lonelinessThreshold = 4 * time.Hour
 
-	// 1. Check if lonely
+	// 1. Check if globally lonely (as a rate limiter)
 	h.lastGlobalMu.RLock()
 	isLonely := time.Since(h.lastGlobalInteraction) > lonelinessThreshold
 	h.lastGlobalMu.RUnlock()
@@ -1072,7 +1088,7 @@ func (h *Handler) performLonelinessCheck() bool {
 		return false
 	}
 
-	// 3. Get candidates
+	// 2. Get all known users
 	users, err := h.memoryStore.GetAllKnownUsers()
 	if err != nil {
 		log.Printf("Error getting known users: %v", err)
@@ -1083,21 +1099,51 @@ func (h *Handler) performLonelinessCheck() bool {
 		return false
 	}
 
-	// 4. Select a user
-	// Just pick a random user
-	idx := time.Now().UnixNano() % int64(len(users))
-	targetUserID := users[idx]
+	// 3. Filter candidates: users who are inactive for 2+ days AND don't have pending DMs
+	var eligibleUsers []string
+	for _, userID := range users {
+		// Check if user has a pending DM (Duolingo-style: don't spam if no response)
+		hasPending, err := h.memoryStore.HasPendingDM(userID)
+		if err != nil {
+			log.Printf("Error checking pending DM for %s: %v", userID, err)
+			continue
+		}
+		if hasPending {
+			log.Printf("User %s has pending DM, skipping", userID)
+			continue
+		}
+
+		// Check last interaction time
+		lastInteraction, err := h.memoryStore.GetLastInteraction(userID)
+		if err != nil {
+			log.Printf("Error getting last interaction for %s: %v", userID, err)
+			continue
+		}
+
+		// If never interacted (zero time), they're eligible
+		// Otherwise check if they've been inactive for 2+ days
+		if lastInteraction.IsZero() || time.Since(lastInteraction) > inactivityThreshold {
+			eligibleUsers = append(eligibleUsers, userID)
+		}
+	}
+
+	if len(eligibleUsers) == 0 {
+		log.Println("No eligible users for boredom DM (all have pending DMs or were active recently)")
+		return false
+	}
+
+	// 4. Select a random eligible user
+	idx := time.Now().UnixNano() % int64(len(eligibleUsers))
+	targetUserID := eligibleUsers[idx]
 
 	// 5. Generate message
-	// We need a context for the user to make it personal
 	facts, _ := h.memoryStore.GetFacts(targetUserID)
 	profileText := "No known facts."
 	if len(facts) > 0 {
 		profileText = "- " + strings.Join(facts, "\n- ")
 	}
 
-	// Get display name (requires fetching user from Discord, or storing it)
-	// We'll try to fetch from Discord
+	// Get display name
 	user, err := h.session.User(targetUserID)
 	userName := "User"
 	if err == nil {
@@ -1131,7 +1177,6 @@ Write a short, casual, friendly message to them to start a conversation.
 	}
 
 	// 6. Send DM
-	// Create DM channel
 	ch, err := h.session.UserChannelCreate(targetUserID)
 	if err != nil {
 		log.Printf("Error creating DM channel for %s: %v", targetUserID, err)
@@ -1144,14 +1189,19 @@ Write a short, casual, friendly message to them to start a conversation.
 		return false
 	}
 
-	log.Printf("Sent lonely message to %s: %s", userName, reply)
+	log.Printf("Sent boredom DM to %s: %s", userName, reply)
+
+	// 7. Mark as pending (Duolingo-style: won't send again until they respond)
+	if err := h.memoryStore.SetPendingDM(targetUserID, time.Now()); err != nil {
+		log.Printf("Error setting pending DM for %s: %v", targetUserID, err)
+	}
 
 	// Update global interaction time so we don't spam
 	h.lastGlobalMu.Lock()
 	h.lastGlobalInteraction = time.Now()
 	h.lastGlobalMu.Unlock()
 
-	// Also update that specific user's last message time?
+	// Also update in-memory tracking
 	h.updateLastMessageTime(targetUserID)
 
 	return true

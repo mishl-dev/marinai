@@ -75,6 +75,13 @@ type Store interface {
 	// General State
 	GetState(key string) (string, error)
 	SetState(key, value string) error
+
+	// Pending DM tracking (Duolingo-style)
+	HasPendingDM(userID string) (bool, error)
+	SetPendingDM(userID string, sentAt time.Time) error
+	ClearPendingDM(userID string) error
+	GetLastInteraction(userID string) (time.Time, error)
+	SetLastInteraction(userID string, timestamp time.Time) error
 }
 
 type FileStore struct {
@@ -360,3 +367,26 @@ func (vs *FileStore) GetState(key string) (string, error) {
 func (vs *FileStore) SetState(key, value string) error {
 	return nil
 }
+
+// Pending DM tracking (FileStore stubs - main implementation is in SurrealStore)
+
+func (vs *FileStore) HasPendingDM(userID string) (bool, error) {
+	return false, nil
+}
+
+func (vs *FileStore) SetPendingDM(userID string, sentAt time.Time) error {
+	return nil
+}
+
+func (vs *FileStore) ClearPendingDM(userID string) error {
+	return nil
+}
+
+func (vs *FileStore) GetLastInteraction(userID string) (time.Time, error) {
+	return time.Time{}, nil
+}
+
+func (vs *FileStore) SetLastInteraction(userID string, timestamp time.Time) error {
+	return nil
+}
+

@@ -182,6 +182,26 @@ func (m *mockMemoryStore) SetState(key, value string) error {
 	return nil
 }
 
+func (m *mockMemoryStore) HasPendingDM(userID string) (bool, error) {
+	return false, nil
+}
+
+func (m *mockMemoryStore) SetPendingDM(userID string, sentAt time.Time) error {
+	return nil
+}
+
+func (m *mockMemoryStore) ClearPendingDM(userID string) error {
+	return nil
+}
+
+func (m *mockMemoryStore) GetLastInteraction(userID string) (time.Time, error) {
+	return time.Time{}, nil
+}
+
+func (m *mockMemoryStore) SetLastInteraction(userID string, timestamp time.Time) error {
+	return nil
+}
+
 // Mock Discord Session
 type mockDiscordSession struct {
 	ChannelMessageSendFunc        func(channelID string, content string, options ...discordgo.RequestOption) (*discordgo.Message, error)
