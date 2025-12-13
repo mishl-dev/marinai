@@ -1,7 +1,9 @@
 package bot
 
 import (
+	"fmt"
 	"log"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -12,11 +14,21 @@ var SlashCommands = []*discordgo.ApplicationCommand{
 		Name:        "reset",
 		Description: "Permanently delete all your conversation history and memories",
 	},
+	{
+		Name:        "stats",
+		Description: "See what Marin remembers about you",
+	},
+	{
+		Name:        "mood",
+		Description: "Check Marin's current mood",
+	},
 }
 
 // SlashCommandHandlers maps command names to their handler functions
 var SlashCommandHandlers = map[string]func(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate){
 	"reset": handleResetCommand,
+	"stats": handleStatsCommand,
+	"mood":  handleMoodCommand,
 }
 
 // handleResetCommand handles the /reset slash command
@@ -52,6 +64,92 @@ func handleResetCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 
 	if err != nil {
 		log.Printf("Error responding to reset command: %v", err)
+	}
+}
+
+// handleStatsCommand handles the /stats slash command - shows what Marin remembers
+func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+	// Get user ID
+	var userID string
+	var userName string
+	if i.Member != nil {
+		userID = i.Member.User.ID
+		userName = i.Member.User.Username
+		if i.Member.User.GlobalName != "" {
+			userName = i.Member.User.GlobalName
+		}
+	} else if i.User != nil {
+		userID = i.User.ID
+		userName = i.User.Username
+		if i.User.GlobalName != "" {
+			userName = i.User.GlobalName
+		}
+	} else {
+		log.Printf("Error: Could not determine user ID for stats command")
+		return
+	}
+
+	// Get facts about the user
+	facts, err := h.memoryStore.GetFacts(userID)
+
+	var responseContent string
+	if err != nil {
+		log.Printf("Error getting facts for user %s: %v", userID, err)
+		responseContent = "Hmm, I had trouble checking my notes... Try again?"
+	} else if len(facts) == 0 {
+		responseContent = fmt.Sprintf("I don't have any notes about you yet, %s! 📝\n\nChat with me more and I'll start remembering things~", userName)
+	} else {
+		// Format facts nicely
+		factList := "• " + strings.Join(facts, "\n• ")
+		responseContent = fmt.Sprintf("**📝 What I remember about %s:**\n\n%s\n\n*Use /reset if you want me to forget everything!*", userName, factList)
+	}
+
+	// Respond to the interaction
+	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: responseContent,
+			Flags:   discordgo.MessageFlagsEphemeral,
+		},
+	})
+
+	if err != nil {
+		log.Printf("Error responding to stats command: %v", err)
+	}
+}
+
+// handleMoodCommand handles the /mood slash command - shows Marin's current mood
+func handleMoodCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+	mood, emoji, description := h.GetCurrentMood()
+
+	responseContent := fmt.Sprintf("%s **%s**\n\n%s", emoji, mood, description)
+
+	// Add a little extra flavor based on mood
+	switch mood {
+	case MoodHyper:
+		responseContent += "\n\n*bounces around excitedly*"
+	case MoodSleepy:
+		responseContent += "\n\n*yawns*"
+	case MoodFlirty:
+		responseContent += " 😏"
+	case MoodNostalgic:
+		responseContent += "\n\n*stares out the window wistfully*"
+	case MoodFocused:
+		responseContent += "\n\n*adjusts glasses*"
+	case MoodBored:
+		responseContent += "\n\n*sighs*"
+	}
+
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: responseContent,
+			Flags:   discordgo.MessageFlagsEphemeral,
+		},
+	})
+
+	if err != nil {
+		log.Printf("Error responding to mood command: %v", err)
 	}
 }
 

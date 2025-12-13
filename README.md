@@ -29,6 +29,11 @@ Marin is an AI-powered Discord bot featuring **long-term memory**, **semantic se
 - **Reminders** — Extracts and schedules event reminders from conversations
 - **Typing Indicators** — Natural typing simulation with configurable delays
 
+### 🖼️ Image Understanding
+- **Vision-Enabled** — Sees and reacts to images users send (powered by Gemini Latest Flash Lite)
+- **Natural Descriptions** — Images are described contextually for the main LLM
+- **NSFW Detection** — Gracefully handles blocked/flagged content
+
 ### 🛡️ Privacy & Control
 - **`/reset` Command** — Users can permanently delete all their data
 - **Per-User Isolation** — Each user's memories are stored separately
@@ -63,18 +68,29 @@ Marin is an AI-powered Discord bot featuring **long-term memory**, **semantic se
 │ • qwen-3-235b │  │ generation      │  │  intent classification  │
 │ • + fallbacks │  │ for semantic    │  │  for emoji reactions    │
 └───────────────┘  │ search          │  └─────────────────────────┘
-                   └─────────────────┘
-                            │
-                            ▼
+        │          └─────────────────┘              │
+        │                   │                       │
+        │                   ▼                       │
+        │     ┌─────────────────────────────┐       │
+        │     │        SurrealDB            │       │
+        │     │                             │       │
+        │     │  • User profiles & facts    │       │
+        │     │  • Vector memories          │       │
+        │     │  • Recent message cache     │       │
+        │     │  • Reminders                │       │
+        │     │  • Emoji cache              │       │
+        │     │  • Pending DM tracking      │       │
+        │     └─────────────────────────────┘       │
+        │                                           │
+        └─────────────────┬─────────────────────────┘
+                          ▼
               ┌─────────────────────────────┐
-              │        SurrealDB            │
+              │     Gemini Vision API       │
+              │   (Image Understanding)     │
               │                             │
-              │  • User profiles & facts    │
-              │  • Vector memories          │
-              │  • Recent message cache     │
-              │  • Reminders                │
-              │  • Emoji cache              │
-              │  • Pending DM tracking      │
+              │  • Gemini 2.0 Flash Lite    │
+              │  • Image → Description      │
+              │  • NSFW detection           │
               └─────────────────────────────┘
 ```
 
@@ -99,6 +115,7 @@ marinai/
 │   ├── cerebras/           # Cerebras API client with model failover
 │   ├── classifier/         # HuggingFace zero-shot classifier
 │   ├── embedding/          # Text embedding API client
+│   ├── vision/             # Gemini Vision API for image understanding
 │   ├── memory/             # Memory store interface & implementations
 │   │   ├── store.go            # Store interface definition
 │   │   ├── surreal_store.go    # SurrealDB implementation
@@ -123,6 +140,7 @@ marinai/
   - Cerebras API
   - Embedding API (e.g., your own or a service)
   - HuggingFace API (for classifier)
+  - Gemini API (optional, for image understanding)
 
 ### Configuration
 
@@ -149,6 +167,7 @@ marinai/
    SURREAL_DB_PASS=your_password
    SURREAL_DB_NAMESPACE=marin    # optional, defaults to 'marin'
    SURREAL_DB_DATABASE=memory    # optional, defaults to 'memory'
+   GEMINI_API_KEY=your_gemini_key  # optional, enables image understanding
    ```
 
 4. **Adjust `config.yml`** if needed:
@@ -207,6 +226,7 @@ go test ./pkg/bot/...
 | Service | Purpose | Fallback |
 |---------|---------|----------|
 | **Cerebras** | LLM chat completions | Auto-cycles through 6 models |
+| **Gemini** | Image understanding | Optional (graceful disable) |
 | **Embedding API** | Text → vector embeddings | Configurable endpoint |
 | **HuggingFace** | Zero-shot classification | Cached per-message |
 | **SurrealDB** | Persistent storage | Required (no fallback) |
@@ -228,6 +248,29 @@ The bot automatically tries models in this order:
 | Command | Description |
 |---------|-------------|
 | `/reset` | Permanently delete all your conversation history and memories |
+| `/stats` | See what Marin remembers about you (your stored facts) |
+| `/mood` | Check Marin's current mood state |
+
+---
+
+## 🎭 Mood System
+
+Marin has 7 different moods that change based on time, activity level, and day of week:
+
+| Mood | Emoji | Trigger | Behavior |
+|------|-------|---------|----------|
+| **HAPPY** | 😊 | Default state | Bubbly and friendly |
+| **HYPER** | ⚡ | High message rate (20+/5min) | Excited, uses caps, exclamation marks |
+| **SLEEPY** | 😴 | Late night (11pm-7am) | Drowsy, uses lowercase, typos |
+| **BORED** | 😐 | Low activity during daytime | Listless, may change subjects |
+| **FLIRTY** | 💋 | Weekend evenings | Extra teasing and playful |
+| **FOCUSED** | 🎯 | Weekday work hours | Brief and to-the-point |
+| **NOSTALGIC** | 🌸 | Sunday afternoons | References old memories, wistful |
+
+Mood also affects:
+- **Typing speed** — Hyper types fast, Sleepy types slow
+- **Reaction frequency** — More reactive when Hyper/Flirty, less when Sleepy/Focused
+- **Response style** — Each mood has unique LLM instructions
 
 ---
 

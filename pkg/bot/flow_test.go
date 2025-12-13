@@ -281,7 +281,7 @@ func TestMessageFlow(t *testing.T) {
 	mockMemory := &mockMemoryStore{}
 	mockSession := &mockDiscordSession{}
 
-	handler := NewHandler(mockCerebras, &MockClassifier{}, mockEmbedding, mockMemory, 0, 7, 20, 24)
+	handler := NewHandler(mockCerebras, &MockClassifier{}, mockEmbedding, nil, mockMemory, 0, 7, 20, 24)
 	handler.SetBotID("testbot")
 
 	// Spies

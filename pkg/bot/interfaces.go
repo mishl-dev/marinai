@@ -59,3 +59,16 @@ type EmbeddingClient interface {
 type Classifier interface {
 	Classify(text string, labels []string) (string, float64, error)
 }
+
+// VisionClient interface for image understanding
+type VisionClient interface {
+	DescribeImageFromURL(imageURL string) (*ImageDescription, error)
+}
+
+// ImageDescription represents the result of analyzing an image
+// This mirrors vision.ImageDescription for interface compatibility
+type ImageDescription struct {
+	Description string
+	IsNSFW      bool
+	Error       error
+}

@@ -9,6 +9,7 @@ import (
 	"marinai/pkg/embedding"
 	"marinai/pkg/memory"
 	"marinai/pkg/surreal"
+	"marinai/pkg/vision"
 	"os"
 	"os/signal"
 	"syscall"
@@ -63,6 +64,16 @@ func main() {
 	embeddingClient := embedding.NewClient(embeddingKey, embeddingURL)
 	classifierClient := classifier.NewClient(hfKey, classifierURL)
 
+	// Initialize Vision Client (Gemini) - optional, for image understanding
+	var visionClient bot.VisionClient
+	geminiKey := os.Getenv("GEMINI_API_KEY")
+	if geminiKey != "" {
+		visionClient = vision.NewAdapter(geminiKey)
+		log.Println("Vision client initialized (Gemini 2.0 Flash Lite)")
+	} else {
+		log.Println("GEMINI_API_KEY not set, image understanding disabled")
+	}
+
 	// Initialize Memory Store (SurrealDB)
 	surrealHost := os.Getenv("SURREAL_DB_HOST")
 	surrealUser := os.Getenv("SURREAL_DB_USER")
@@ -105,6 +116,7 @@ func main() {
 		cerebrasClient,
 		classifierClient,
 		embeddingClient,
+		visionClient,
 		memoryStore,
 		cfg.Delays.MessageProcessing,
 		cfg.MemorySettings.FactAgingDays,

@@ -17,6 +17,7 @@ type Handler struct {
 	cerebrasClient         CerebrasClient
 	classifierClient       Classifier
 	embeddingClient        EmbeddingClient
+	visionClient           VisionClient
 	memoryStore            memory.Store
 	taskAgent              *TaskAgent
 	botID                  string
@@ -44,11 +45,12 @@ type Handler struct {
 	moodMu         sync.RWMutex
 }
 
-func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, m memory.Store, messageProcessingDelay float64, factAgingDays int, factSummarizationThreshold int, maintenanceIntervalHours float64) *Handler {
+func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, v VisionClient, m memory.Store, messageProcessingDelay float64, factAgingDays int, factSummarizationThreshold int, maintenanceIntervalHours float64) *Handler {
 	h := &Handler{
 		cerebrasClient:             c,
 		classifierClient:           NewCachedClassifier(cl, 1000, "bart-large-mnli"),
 		embeddingClient:            e,
+		visionClient:               v,
 		memoryStore:                m,
 		taskAgent:                  NewTaskAgent(c, cl),
 		lastMessageTimes:           make(map[string]time.Time),
@@ -241,14 +243,15 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 
 	// Parallelize data gathering to reduce latency
 	var (
-		recentMsgs []memory.RecentMessageItem
-		matches    []string
-		facts      []string
-		emojiText  string
+		recentMsgs   []memory.RecentMessageItem
+		matches      []string
+		facts        []string
+		emojiText    string
+		imageContext string
 	)
 
 	var gatherWg sync.WaitGroup
-	gatherWg.Add(4)
+	gatherWg.Add(5)
 
 	// 1. Recent Context
 	go func() {
@@ -313,6 +316,12 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 		}
 	}()
 
+	// 5. Process Image Attachments (if any)
+	go func() {
+		defer gatherWg.Done()
+		imageContext = h.processImageAttachments(m.Attachments)
+	}()
+
 	// Wait for all data
 	gatherWg.Wait()
 
@@ -353,17 +362,7 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	mood := h.currentMood
 	h.moodMu.RUnlock()
 
-	moodInstruction := ""
-	switch mood {
-	case "HYPER":
-		moodInstruction = "Current Mood: HYPER. Act very excited, use more caps, exclamation marks, and emojis! Speak fast!"
-	case "SLEEPY":
-		moodInstruction = "Current Mood: SLEEPY. Act tired, yawn ( *yawns* ), use lowercase, maybe a typo or two. Be slow."
-	case "BORED":
-		moodInstruction = "Current Mood: BORED. Act a bit listless, maybe poke the user or change the subject. Sigh."
-	default:
-		moodInstruction = "Current Mood: HAPPY. Act normally (bubbly and friendly)."
-	}
+	moodInstruction := GetMoodInstruction(mood)
 
 	systemPrompt := fmt.Sprintf("%s\n\n%s", fmt.Sprintf(SystemPrompt, displayName, profileText), moodInstruction)
 	messages := []cerebras.Message{
@@ -381,7 +380,18 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 		messages = append(messages, cerebras.Message{Role: "system", Content: emojiText})
 	}
 
-	messages = append(messages, cerebras.Message{Role: "user", Content: m.Content})
+	// Build user message with image context if present
+	userMessage := m.Content
+	if imageContext != "" {
+		if userMessage == "" {
+			userMessage = imageContext
+		} else {
+			userMessage = imageContext + "\n" + userMessage
+		}
+		log.Printf("Image context added: %s", imageContext)
+	}
+
+	messages = append(messages, cerebras.Message{Role: "user", Content: userMessage})
 
 	// 6. Generate Reply
 	reply, err := h.cerebrasClient.ChatCompletion(messages)

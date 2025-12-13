@@ -137,7 +137,7 @@ func TestHandler_Flow(t *testing.T) {
 	}
 
 	// Initialize Handler
-	handler := NewHandler(cerebrasClient, &MockClassifier{}, embeddingClient, memoryStore, 0, 7, 20, 24)
+	handler := NewHandler(cerebrasClient, &MockClassifier{}, embeddingClient, nil, memoryStore, 0, 7, 20, 24)
 	botID := "mock_bot_id"
 	handler.SetBotID(botID)
 
@@ -237,7 +237,7 @@ func TestHandler_FlowStructure(t *testing.T) {
 	memoryStore.AddRecentMessage("test_user_structure", "user", "How was your day?")
 	memoryStore.AddRecentMessage("test_user_structure", "assistant", "It was fine, I guess.")
 
-	handler := NewHandler(cerebrasClient, &MockClassifier{}, embeddingClient, memoryStore, 0, 7, 20, 24)
+	handler := NewHandler(cerebrasClient, &MockClassifier{}, embeddingClient, nil, memoryStore, 0, 7, 20, 24)
 	botID := "mock_bot_id"
 	handler.SetBotID(botID)
 
@@ -328,7 +328,7 @@ func TestHandler_DMBehavior(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	memoryStore := memory.NewFileStore(tmpDir)
 
-	handler := NewHandler(cerebrasClient, &MockClassifier{}, embeddingClient, memoryStore, 0, 7, 20, 24)
+	handler := NewHandler(cerebrasClient, &MockClassifier{}, embeddingClient, nil, memoryStore, 0, 7, 20, 24)
 	botID := "mock_bot_id"
 	handler.SetBotID(botID)
 
