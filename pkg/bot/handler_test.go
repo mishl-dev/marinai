@@ -88,15 +88,6 @@ func (m *MockSession) UpdateStatusComplex(usd discordgo.UpdateStatusData) error 
 	return nil
 }
 
-type MockClassifier struct{}
-
-func (m *MockClassifier) Classify(text string, labels []string) (string, float64, error) {
-	if len(labels) > 0 {
-		return labels[0], 0.9, nil
-	}
-	return "", 0, nil
-}
-
 func TestHandler_Flow(t *testing.T) {
 	// Load .env from project root
 	if err := godotenv.Load("../../.env"); err != nil {
@@ -137,7 +128,8 @@ func TestHandler_Flow(t *testing.T) {
 	}
 
 	// Initialize Handler
-	handler := NewHandler(cerebrasClient, &MockClassifier{}, embeddingClient, nil, memoryStore, 0, 7, 20, 24)
+	mockGemini := &MockGeminiClient{}
+	handler := NewHandler(cerebrasClient, embeddingClient, mockGemini, memoryStore, 0, 7, 20, 24)
 	botID := "mock_bot_id"
 	handler.SetBotID(botID)
 
@@ -237,7 +229,8 @@ func TestHandler_FlowStructure(t *testing.T) {
 	memoryStore.AddRecentMessage("test_user_structure", "user", "How was your day?")
 	memoryStore.AddRecentMessage("test_user_structure", "assistant", "It was fine, I guess.")
 
-	handler := NewHandler(cerebrasClient, &MockClassifier{}, embeddingClient, nil, memoryStore, 0, 7, 20, 24)
+	mockGemini := &MockGeminiClient{}
+	handler := NewHandler(cerebrasClient, embeddingClient, mockGemini, memoryStore, 0, 7, 20, 24)
 	botID := "mock_bot_id"
 	handler.SetBotID(botID)
 
@@ -328,7 +321,8 @@ func TestHandler_DMBehavior(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	memoryStore := memory.NewFileStore(tmpDir)
 
-	handler := NewHandler(cerebrasClient, &MockClassifier{}, embeddingClient, nil, memoryStore, 0, 7, 20, 24)
+	mockGemini := &MockGeminiClient{}
+	handler := NewHandler(cerebrasClient, embeddingClient, mockGemini, memoryStore, 0, 7, 20, 24)
 	botID := "mock_bot_id"
 	handler.SetBotID(botID)
 

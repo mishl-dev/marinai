@@ -53,6 +53,9 @@ type mockMemoryStore struct {
 	SetCachedEmojisFunc         func(guildID string, emojis []string) error
 	GetCachedClassificationFunc func(text string, model string) (string, float64, error)
 	SetCachedClassificationFunc func(text string, model string, label string, score float64) error
+	GetAffectionFunc            func(userID string) (int, error)
+	AddAffectionFunc            func(userID string, amount int) error
+	SetAffectionFunc            func(userID string, amount int) error
 }
 
 func (m *mockMemoryStore) Add(userId string, text string, vector []float32) error {
@@ -202,6 +205,27 @@ func (m *mockMemoryStore) SetLastInteraction(userID string, timestamp time.Time)
 	return nil
 }
 
+func (m *mockMemoryStore) GetAffection(userID string) (int, error) {
+	if m.GetAffectionFunc != nil {
+		return m.GetAffectionFunc(userID)
+	}
+	return 0, nil
+}
+
+func (m *mockMemoryStore) AddAffection(userID string, amount int) error {
+	if m.AddAffectionFunc != nil {
+		return m.AddAffectionFunc(userID, amount)
+	}
+	return nil
+}
+
+func (m *mockMemoryStore) SetAffection(userID string, amount int) error {
+	if m.SetAffectionFunc != nil {
+		return m.SetAffectionFunc(userID, amount)
+	}
+	return nil
+}
+
 // Mock Discord Session
 type mockDiscordSession struct {
 	ChannelMessageSendFunc        func(channelID string, content string, options ...discordgo.RequestOption) (*discordgo.Message, error)
@@ -281,7 +305,8 @@ func TestMessageFlow(t *testing.T) {
 	mockMemory := &mockMemoryStore{}
 	mockSession := &mockDiscordSession{}
 
-	handler := NewHandler(mockCerebras, &MockClassifier{}, mockEmbedding, nil, mockMemory, 0, 7, 20, 24)
+	mockGemini := &MockGeminiClient{}
+	handler := NewHandler(mockCerebras, mockEmbedding, mockGemini, mockMemory, 0, 7, 20, 24)
 	handler.SetBotID("testbot")
 
 	// Spies
