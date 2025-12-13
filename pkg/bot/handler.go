@@ -86,6 +86,7 @@ func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, v VisionClie
 	go h.checkReminders()
 	go h.runMoodLoop()
 	go h.cleanupLoop()
+	go h.runAffectionDecayLoop()
 
 	return h
 }

@@ -82,6 +82,11 @@ type Store interface {
 	ClearPendingDM(userID string) error
 	GetLastInteraction(userID string) (time.Time, error)
 	SetLastInteraction(userID string, timestamp time.Time) error
+
+	// Affection System
+	GetAffection(userID string) (int, error)
+	AddAffection(userID string, amount int) error
+	SetAffection(userID string, amount int) error
 }
 
 type FileStore struct {
@@ -387,6 +392,20 @@ func (vs *FileStore) GetLastInteraction(userID string) (time.Time, error) {
 }
 
 func (vs *FileStore) SetLastInteraction(userID string, timestamp time.Time) error {
+	return nil
+}
+
+// Affection System (FileStore stubs)
+
+func (vs *FileStore) GetAffection(userID string) (int, error) {
+	return 0, nil
+}
+
+func (vs *FileStore) AddAffection(userID string, amount int) error {
+	return nil
+}
+
+func (vs *FileStore) SetAffection(userID string, amount int) error {
 	return nil
 }
 

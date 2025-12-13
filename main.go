@@ -61,7 +61,8 @@ func main() {
 
 	// Initialize Clients
 	cerebrasClient := cerebras.NewClient(cerebrasKey, cfg.ModelSettings.Temperature, cfg.ModelSettings.TopP, nil)
-	embeddingClient := embedding.NewClient(embeddingKey, embeddingURL)
+	baseEmbeddingClient := embedding.NewClient(embeddingKey, embeddingURL)
+	embeddingClient := embedding.NewCachedClient(baseEmbeddingClient, 500) // Cache up to 500 embeddings
 	classifierClient := classifier.NewClient(hfKey, classifierURL)
 
 	// Initialize Vision Client (Gemini) - optional, for image understanding
@@ -176,7 +177,7 @@ func main() {
 				},
 			},
 		},
-		Status: "idle",
+		Status: "online",
 		AFK:    true,
 	})
 	if err != nil {

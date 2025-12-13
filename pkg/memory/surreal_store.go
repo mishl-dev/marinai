@@ -86,6 +86,9 @@ func (s *SurrealStore) Init() error {
 		DEFINE TABLE IF NOT EXISTS pending_dm SCHEMAFULL;
 		DEFINE FIELD IF NOT EXISTS user_id ON pending_dm TYPE string;
 		DEFINE FIELD IF NOT EXISTS sent_at ON pending_dm TYPE int;
+
+	// Add affection field to user_profiles (for affection system)
+		DEFINE FIELD IF NOT EXISTS affection ON user_profiles TYPE option<int>;
 	`
 	_, err := s.client.Query(query, map[string]interface{}{})
 	return err
@@ -758,6 +761,79 @@ func (s *SurrealStore) SetLastInteraction(userID string, timestamp time.Time) er
 	_, err := s.client.Query(query, map[string]interface{}{
 		"user_id":   userID,
 		"timestamp": timestamp.Unix(),
+	})
+	return err
+}
+
+// Affection System
+
+// GetAffection returns the affection level for a user (0-100)
+func (s *SurrealStore) GetAffection(userID string) (int, error) {
+	query := `SELECT affection FROM user_profiles WHERE id = type::thing("user_profiles", $user_id);`
+	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
+	if err != nil {
+		return 0, err
+	}
+
+	rows, ok := result.([]interface{})
+	if !ok || len(rows) == 0 {
+		return 0, nil // No record = 0 affection
+	}
+
+	if row, ok := rows[0].(map[string]interface{}); ok {
+		switch a := row["affection"].(type) {
+		case float64:
+			return int(a), nil
+		case int64:
+			return int(a), nil
+		case int:
+			return a, nil
+		case nil:
+			return 0, nil
+		}
+	}
+
+	return 0, nil
+}
+
+// AddAffection adds to the user's affection level (clamped to 0-100)
+func (s *SurrealStore) AddAffection(userID string, amount int) error {
+	// Get current affection
+	current, err := s.GetAffection(userID)
+	if err != nil {
+		current = 0
+	}
+
+	// Calculate new value, clamped to 0-100
+	newValue := current + amount
+	if newValue < 0 {
+		newValue = 0
+	}
+	if newValue > 100 {
+		newValue = 100
+	}
+
+	return s.SetAffection(userID, newValue)
+}
+
+// SetAffection sets the user's affection level directly
+func (s *SurrealStore) SetAffection(userID string, amount int) error {
+	// Clamp to 0-10000
+	if amount < 0 {
+		amount = 0
+	}
+	if amount > 10000 {
+		amount = 10000
+	}
+
+	query := `
+		INSERT INTO user_profiles (id, user_id, facts, last_updated, affection)
+		VALUES (type::thing("user_profiles", $user_id), $user_id, [], time::unix(), $affection)
+		ON DUPLICATE KEY UPDATE affection = $affection, last_updated = time::unix();
+	`
+	_, err := s.client.Query(query, map[string]interface{}{
+		"user_id":   userID,
+		"affection": amount,
 	})
 	return err
 }

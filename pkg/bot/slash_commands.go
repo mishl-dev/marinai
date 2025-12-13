@@ -22,13 +22,18 @@ var SlashCommands = []*discordgo.ApplicationCommand{
 		Name:        "mood",
 		Description: "Check Marin's current mood",
 	},
+	{
+		Name:        "affection",
+		Description: "Check your relationship status with Marin",
+	},
 }
 
 // SlashCommandHandlers maps command names to their handler functions
 var SlashCommandHandlers = map[string]func(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate){
-	"reset": handleResetCommand,
-	"stats": handleStatsCommand,
-	"mood":  handleMoodCommand,
+	"reset":     handleResetCommand,
+	"stats":     handleStatsCommand,
+	"mood":      handleMoodCommand,
+	"affection": handleAffectionCommand,
 }
 
 // handleResetCommand handles the /reset slash command
@@ -150,6 +155,61 @@ func handleMoodCommand(h *Handler, s *discordgo.Session, i *discordgo.Interactio
 
 	if err != nil {
 		log.Printf("Error responding to mood command: %v", err)
+	}
+}
+
+// handleAffectionCommand handles the /affection slash command - shows relationship status
+func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+	// Get user ID
+	var userID string
+	var userName string
+	if i.Member != nil {
+		userID = i.Member.User.ID
+		userName = i.Member.User.Username
+		if i.Member.User.GlobalName != "" {
+			userName = i.Member.User.GlobalName
+		}
+	} else if i.User != nil {
+		userID = i.User.ID
+		userName = i.User.Username
+		if i.User.GlobalName != "" {
+			userName = i.User.GlobalName
+		}
+	} else {
+		log.Printf("Error: Could not determine user ID for affection command")
+		return
+	}
+
+	affection, level := h.GetUserAffection(userID)
+
+	responseContent := fmt.Sprintf("**💕 Relationship with %s**\n\n%s", userName, FormatAffectionDisplay(affection))
+
+	// Add flavor text based on level
+	switch level.Name {
+	case "Stranger":
+		responseContent += "\n\nwe just met~ let's chat more!"
+	case "Acquaintance":
+		responseContent += "\n\ni'm starting to remember you~"
+	case "Friend":
+		responseContent += "\n\nwe're friends now! nice"
+	case "Close Friend":
+		responseContent += "\n\nyou're like... really important to me"
+	case "Best Friend":
+		responseContent += "\n\ni literally think about you all the time"
+	case "Special Someone":
+		responseContent += "\n\n...you know how i feel about you right? 💕"
+	}
+
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: responseContent,
+			Flags:   discordgo.MessageFlagsEphemeral,
+		},
+	})
+
+	if err != nil {
+		log.Printf("Error responding to affection command: %v", err)
 	}
 }
 

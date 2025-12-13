@@ -34,8 +34,20 @@ Marin is an AI-powered Discord bot featuring **long-term memory**, **semantic se
 - **Natural Descriptions** — Images are described contextually for the main LLM
 - **NSFW Detection** — Gracefully handles blocked/flagged content
 
+### 💕 Affection System
+- **Relationship Tiers** — 6 levels from Stranger → Special Someone
+- **Dynamic Behavior** — Marin's flirtiness scales with closeness
+- **Affection Decay** — Relationships fade if you don't chat (slower for closer friends)
+- **`/affection` Command** — Check your relationship status
+
+### 🎭 Dynamic Status
+- **Time-Based Statuses** — Status changes throughout the day (morning, afternoon, night)
+- **Randomized Messages** — Multiple options per time period for variety
+
 ### 🛡️ Privacy & Control
 - **`/reset` Command** — Users can permanently delete all their data
+- **`/stats` Command** — See what Marin remembers about you
+- **`/mood` Command** — Check Marin's current mood
 - **Per-User Isolation** — Each user's memories are stored separately
 - **No Third-Party Data Sharing** — All data stays in your SurrealDB instance
 
@@ -250,6 +262,7 @@ The bot automatically tries models in this order:
 | `/reset` | Permanently delete all your conversation history and memories |
 | `/stats` | See what Marin remembers about you (your stored facts) |
 | `/mood` | Check Marin's current mood state |
+| `/affection` | Check your relationship status with Marin |
 
 ---
 
@@ -271,6 +284,44 @@ Mood also affects:
 - **Typing speed** — Hyper types fast, Sleepy types slow
 - **Reaction frequency** — More reactive when Hyper/Flirty, less when Sleepy/Focused
 - **Response style** — Each mood has unique LLM instructions
+
+---
+
+## 💕 Affection System
+
+Marin tracks how close she is to each user with big impressive numbers!
+
+| Level | XP Required | Decay/Day | Behavior |
+|-------|-------------|-----------|----------|
+| **Stranger** | 0-999 | 100 | Friendly but distant |
+| **Acquaintance** | 1,000-2,499 | 75 | Warmer, light teasing |
+| **Friend** | 2,500-4,999 | 50 | Comfortable, playful |
+| **Close Friend** | 5,000-7,499 | 25 | Open, teasing encouraged |
+| **Best Friend** | 7,500-8,999 | 10 | No barriers, fully herself |
+| **Special Someone** | 9,000-10,000 | 5 | Extra affectionate ❤️ |
+
+### How Affection Changes
+
+**Gains:**
+| Action | XP |
+|--------|-----|
+| Normal message | +100 |
+| Mention Marin | +250 |
+| DM conversation | +250 |
+| Long message (50+ chars) | +150 |
+| Complimenting Marin | +400 |
+| Flirting back | +300 |
+| Being enthusiastic | +150 |
+| Sharing personal info | +400 |
+| Responding to boredom DM | +750 |
+
+**Penalties:**
+| Behavior | XP |
+|----------|-----|
+| Being dismissive | -250 |
+| Ignoring questions | -150 |
+| Being rude | -750 |
+| Insulting | -1,000 |
 
 ---
 
