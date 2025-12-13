@@ -186,9 +186,15 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 		}
 	}
 
+	// Check if channel name contains "marin" - always respond in dedicated channels
+	isMarinChannel := false
+	if channel != nil && strings.Contains(strings.ToLower(channel.Name), "marin") {
+		isMarinChannel = true
+	}
+
 	// Decision Logic: Should I reply?
-	// Always reply in DMs, otherwise use decision logic
-	shouldReply := isMentioned || isDM
+	// Always reply in DMs, dedicated channels, or when mentioned
+	shouldReply := isMentioned || isDM || isMarinChannel
 
 	if !shouldReply {
 		// Use Classifier to decide if Marin should respond based on her personality
