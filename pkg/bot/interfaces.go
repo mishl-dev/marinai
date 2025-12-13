@@ -56,17 +56,16 @@ type EmbeddingClient interface {
 	Embed(text string) ([]float32, error)
 }
 
-type Classifier interface {
+
+
+// GeminiClient interface for Gemini API (vision + classification)
+type GeminiClient interface {
+	DescribeImageFromURL(imageURL string) (*ImageDescription, error)
 	Classify(text string, labels []string) (string, float64, error)
 }
 
-// VisionClient interface for image understanding
-type VisionClient interface {
-	DescribeImageFromURL(imageURL string) (*ImageDescription, error)
-}
-
 // ImageDescription represents the result of analyzing an image
-// This mirrors vision.ImageDescription for interface compatibility
+// This mirrors gemini.ImageDescription for interface compatibility
 type ImageDescription struct {
 	Description string
 	IsNSFW      bool

@@ -15,9 +15,8 @@ import (
 
 type Handler struct {
 	cerebrasClient         CerebrasClient
-	classifierClient       Classifier
 	embeddingClient        EmbeddingClient
-	visionClient           VisionClient
+	geminiClient           GeminiClient
 	memoryStore            memory.Store
 	taskAgent              *TaskAgent
 	botID                  string
@@ -45,14 +44,13 @@ type Handler struct {
 	moodMu         sync.RWMutex
 }
 
-func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, v VisionClient, m memory.Store, messageProcessingDelay float64, factAgingDays int, factSummarizationThreshold int, maintenanceIntervalHours float64) *Handler {
+func NewHandler(c CerebrasClient, e EmbeddingClient, g GeminiClient, m memory.Store, messageProcessingDelay float64, factAgingDays int, factSummarizationThreshold int, maintenanceIntervalHours float64) *Handler {
 	h := &Handler{
 		cerebrasClient:             c,
-		classifierClient:           NewCachedClassifier(cl, 1000, "bart-large-mnli"),
 		embeddingClient:            e,
-		visionClient:               v,
+		geminiClient:               g,
 		memoryStore:                m,
-		taskAgent:                  NewTaskAgent(c, cl),
+		taskAgent:                  NewTaskAgent(c, g),
 		lastMessageTimes:           make(map[string]time.Time),
 		messageProcessingDelay:     time.Duration(messageProcessingDelay * float64(time.Second)),
 		processingUsers:            make(map[string]bool),
@@ -197,7 +195,7 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	shouldReply := isMentioned || isDM || isMarinChannel
 
 	if !shouldReply {
-		// Use Classifier to decide if Marin should respond based on her personality
+		// Use Gemini to decide if Marin should respond based on her personality
 		labels := []string{
 			"message directly addressing Marin or Kitagawa",
 			"discussion about cosplay, anime, or games",
@@ -207,7 +205,7 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 			"casual conversation or blank message without mention of marin",
 		}
 
-		label, score, err := h.classifierClient.Classify(m.Content, labels)
+		label, score, err := h.geminiClient.Classify(m.Content, labels)
 		if err != nil {
 			log.Printf("Error classifying message: %v", err)
 		} else {
@@ -224,6 +222,9 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 		go h.evaluateReaction(s, m.ChannelID, m.ID, m.Content)
 		return
 	}
+
+	// Calculate affection changes in background (don't block reply)
+	go h.UpdateAffectionForMessage(m.Author.ID, m.Content, isMentioned, isDM, false)
 
 	// Prepare display name
 	displayName := m.Author.Username

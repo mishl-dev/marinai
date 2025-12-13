@@ -99,7 +99,7 @@ func (h *Handler) evaluateReaction(s Session, channelID, messageID, content stri
 
 	labels := buildLabelsForClassification()
 
-	label, score, err := h.classifierClient.Classify(content, labels)
+	label, score, err := h.geminiClient.Classify(content, labels)
 	if err != nil {
 		return
 	}

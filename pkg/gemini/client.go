@@ -1,4 +1,4 @@
-package vision
+package gemini
 
 import (
 	"bytes"
@@ -237,4 +237,99 @@ func (c *Client) DescribeImageFromURL(imageURL string) (*ImageDescription, error
 	}
 
 	return c.DescribeImage(imageData, contentType)
+}
+
+// Classify uses Gemini to classify text into one of the provided labels
+// Returns the best matching label and a confidence score (0.0-1.0)
+func (c *Client) Classify(text string, labels []string) (string, float64, error) {
+	if c.apiKey == "" {
+		return "", 0, fmt.Errorf("gemini API key not configured")
+	}
+
+	// Build the labels list for the prompt
+	labelsStr := ""
+	for i, label := range labels {
+		labelsStr += fmt.Sprintf("%d. %s\n", i+1, label)
+	}
+
+	prompt := fmt.Sprintf(`Classify this text into exactly ONE of the following categories:
+
+%s
+Text to classify: "%s"
+
+Output a JSON object with:
+- "label": the exact category name that best matches
+- "confidence": a number from 0.0 to 1.0 indicating how confident you are
+
+Output ONLY valid JSON. Example: {"label": "neutral", "confidence": 0.85}`, labelsStr, text)
+
+	reqBody := geminiRequest{
+		Contents: []geminiContent{
+			{
+				Parts: []geminiPart{
+					{Text: prompt},
+				},
+			},
+		},
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s?key=%s", geminiAPIURL, c.apiKey)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to perform request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", 0, fmt.Errorf("gemini API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var geminiResp geminiResponse
+	if err := json.Unmarshal(bodyBytes, &geminiResp); err != nil {
+		return "", 0, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
+		return "", 0, fmt.Errorf("no response from Gemini")
+	}
+
+	// Parse the JSON response
+	responseText := strings.TrimSpace(geminiResp.Candidates[0].Content.Parts[0].Text)
+	
+	// Strip markdown code blocks if present
+	if strings.HasPrefix(responseText, "```") {
+		lines := strings.Split(responseText, "\n")
+		if len(lines) >= 2 {
+			responseText = strings.Join(lines[1:len(lines)-1], "\n")
+		}
+	}
+	responseText = strings.TrimSpace(responseText)
+
+	var result struct {
+		Label      string  `json:"label"`
+		Confidence float64 `json:"confidence"`
+	}
+	if err := json.Unmarshal([]byte(responseText), &result); err != nil {
+		// If JSON parsing fails, return the first label as fallback
+		return labels[0], 0.5, nil
+	}
+
+	return result.Label, result.Confidence, nil
 }

@@ -4,12 +4,12 @@ import (
 	"log"
 	"marinai/pkg/bot"
 	"marinai/pkg/cerebras"
-	"marinai/pkg/classifier"
+
 	"marinai/pkg/config"
 	"marinai/pkg/embedding"
 	"marinai/pkg/memory"
 	"marinai/pkg/surreal"
-	"marinai/pkg/vision"
+	"marinai/pkg/gemini"
 	"os"
 	"os/signal"
 	"syscall"
@@ -33,7 +33,7 @@ func main() {
 	token := os.Getenv("DISCORD_TOKEN")
 	cerebrasKey := os.Getenv("CEREBRAS_API_KEY")
 	embeddingKey := os.Getenv("EMBEDDING_API_KEY")
-	hfKey := os.Getenv("HF_API_KEY")
+
 
 	// Check each required environment variable individually for better error messages
 	if token == "" {
@@ -45,34 +45,29 @@ func main() {
 	if embeddingKey == "" {
 		log.Fatal("Missing required environment variable: EMBEDDING_API_KEY")
 	}
-	if hfKey == "" {
-		log.Fatal("Missing required environment variable: HF_API_KEY")
-	}
+
 
 	embeddingURL := os.Getenv("EMBEDDING_API_URL")
 	if embeddingURL == "" {
 		embeddingURL = "https://vector.mishl.dev/embed"
 	}
 
-	classifierURL := os.Getenv("CLASSIFIER_API_URL")
-	if classifierURL == "" {
-		classifierURL = "https://router.huggingface.co/hf-inference/models/MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7"
-	}
+
 
 	// Initialize Clients
 	cerebrasClient := cerebras.NewClient(cerebrasKey, cfg.ModelSettings.Temperature, cfg.ModelSettings.TopP, nil)
 	baseEmbeddingClient := embedding.NewClient(embeddingKey, embeddingURL)
 	embeddingClient := embedding.NewCachedClient(baseEmbeddingClient, 500) // Cache up to 500 embeddings
-	classifierClient := classifier.NewClient(hfKey, classifierURL)
 
-	// Initialize Vision Client (Gemini) - optional, for image understanding
-	var visionClient bot.VisionClient
+
+	// Initialize Gemini Client - for image understanding and fast classification
+	var geminiClient bot.GeminiClient
 	geminiKey := os.Getenv("GEMINI_API_KEY")
 	if geminiKey != "" {
-		visionClient = vision.NewAdapter(geminiKey)
-		log.Println("Vision client initialized (Gemini 2.0 Flash Lite)")
+		geminiClient = gemini.NewAdapter(geminiKey)
+		log.Println("Gemini client initialized (Flash Lite - vision + classification)")
 	} else {
-		log.Println("GEMINI_API_KEY not set, image understanding disabled")
+		log.Println("GEMINI_API_KEY not set, image understanding and fast classification disabled")
 	}
 
 	// Initialize Memory Store (SurrealDB)
@@ -115,9 +110,8 @@ func main() {
 	// Initialize Bot Handler
 	handler := bot.NewHandler(
 		cerebrasClient,
-		classifierClient,
 		embeddingClient,
-		visionClient,
+		geminiClient,
 		memoryStore,
 		cfg.Delays.MessageProcessing,
 		cfg.MemorySettings.FactAgingDays,

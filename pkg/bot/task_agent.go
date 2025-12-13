@@ -8,14 +8,14 @@ import (
 )
 
 type TaskAgent struct {
-	cerebrasClient   CerebrasClient
-	classifierClient Classifier
+	cerebrasClient CerebrasClient
+	geminiClient   GeminiClient
 }
 
-func NewTaskAgent(c CerebrasClient, cl Classifier) *TaskAgent {
+func NewTaskAgent(c CerebrasClient, g GeminiClient) *TaskAgent {
 	return &TaskAgent{
-		cerebrasClient:   c,
-		classifierClient: cl,
+		cerebrasClient: c,
+		geminiClient:   g,
 	}
 }
 
@@ -29,7 +29,7 @@ func (ta *TaskAgent) CheckTask(userMsg string) (bool, string) {
 		"requesting for long writing task",
 	}
 
-	label, score, err := ta.classifierClient.Classify(userMsg, labels)
+	label, score, err := ta.geminiClient.Classify(userMsg, labels)
 	if err != nil {
 		log.Printf("Error classifying task: %v", err)
 		// Fallback to assuming it's safe if classifier fails

@@ -40,58 +40,69 @@ func NewSurrealStore(client *surreal.Client) *SurrealStore {
 }
 
 func (s *SurrealStore) Init() error {
-	query := `
-		DEFINE TABLE IF NOT EXISTS memories SCHEMAFULL;
-		DEFINE FIELD IF NOT EXISTS user_id ON memories TYPE string;
-		DEFINE FIELD IF NOT EXISTS text ON memories TYPE string;
-		DEFINE FIELD IF NOT EXISTS timestamp ON memories TYPE int;
-		-- We define the vector field with 2048 dimensions
-		DEFINE FIELD IF NOT EXISTS vector ON memories TYPE array<float> ASSERT array::len($value) == 2048;
-		DEFINE INDEX IF NOT EXISTS vector_idx ON memories FIELDS vector MTREE DIMENSION 2048 DIST COSINE;
+	queries := []string{
+		// -- Tables --
+		"DEFINE TABLE IF NOT EXISTS memories SCHEMAFULL",
+		"DEFINE TABLE IF NOT EXISTS user_profiles SCHEMAFULL",
+		"DEFINE TABLE IF NOT EXISTS guild_cache SCHEMAFULL",
+		"DEFINE TABLE IF NOT EXISTS recent_messages SCHEMAFULL",
+		"DEFINE TABLE IF NOT EXISTS reminders SCHEMAFULL",
+		"DEFINE TABLE IF NOT EXISTS bot_state SCHEMAFULL",
+		"DEFINE TABLE IF NOT EXISTS pending_dm SCHEMAFULL",
 
-	// Define schema for user profiles
-		DEFINE TABLE IF NOT EXISTS user_profiles SCHEMAFULL;
-		DEFINE FIELD IF NOT EXISTS user_id ON user_profiles TYPE string;
-		DEFINE FIELD IF NOT EXISTS facts ON user_profiles TYPE array<object>;
-		DEFINE FIELD IF NOT EXISTS facts[*].text ON user_profiles TYPE string;
-		DEFINE FIELD IF NOT EXISTS facts[*].created_at ON user_profiles TYPE int;
-		DEFINE FIELD IF NOT EXISTS last_updated ON user_profiles TYPE int;
-		DEFINE FIELD IF NOT EXISTS last_interaction ON user_profiles TYPE option<int>;
+		// -- Memories --
+		"DEFINE FIELD IF NOT EXISTS user_id ON memories TYPE string",
+		"DEFINE FIELD IF NOT EXISTS text ON memories TYPE string",
+		"DEFINE FIELD IF NOT EXISTS timestamp ON memories TYPE int",
+		"DEFINE FIELD IF NOT EXISTS vector ON memories TYPE array<float> ASSERT array::len($value) == 2048",
+		"DEFINE INDEX IF NOT EXISTS vector_idx ON memories FIELDS vector MTREE DIMENSION 2048 DIST COSINE",
 
-	// Define schema for guild cache (emojis)
-		DEFINE TABLE IF NOT EXISTS guild_cache SCHEMAFULL;
-		DEFINE FIELD IF NOT EXISTS emojis ON guild_cache TYPE array<string>;
-		DEFINE FIELD IF NOT EXISTS last_updated ON guild_cache TYPE int;
+		// -- User Profiles --
+		"DEFINE FIELD IF NOT EXISTS user_id ON user_profiles TYPE string",
+		"DEFINE FIELD IF NOT EXISTS facts ON user_profiles TYPE array<object>",
+		"DEFINE FIELD IF NOT EXISTS facts[*].text ON user_profiles TYPE string",
+		"DEFINE FIELD IF NOT EXISTS facts[*].created_at ON user_profiles TYPE int",
+		"DEFINE FIELD IF NOT EXISTS last_updated ON user_profiles TYPE int",
+		// We use int DEFAULT 0 to avoid NONE issues
+		"DEFINE FIELD IF NOT EXISTS last_interaction ON user_profiles TYPE int DEFAULT 0",
+		"DEFINE FIELD IF NOT EXISTS affection ON user_profiles TYPE int DEFAULT 0",
 
-	// Define schema for recent messages
-		DEFINE TABLE IF NOT EXISTS recent_messages SCHEMAFULL;
-		DEFINE FIELD IF NOT EXISTS user_id ON recent_messages TYPE string;
-		DEFINE FIELD IF NOT EXISTS role ON recent_messages TYPE string;
-		DEFINE FIELD IF NOT EXISTS text ON recent_messages TYPE string;
-		DEFINE FIELD IF NOT EXISTS timestamp ON recent_messages TYPE int;
+		// -- Guild Cache --
+		"DEFINE FIELD IF NOT EXISTS emojis ON guild_cache TYPE array<string>",
+		"DEFINE FIELD IF NOT EXISTS last_updated ON guild_cache TYPE int",
 
-	// Define schema for reminders
-		DEFINE TABLE IF NOT EXISTS reminders SCHEMAFULL;
-		DEFINE FIELD IF NOT EXISTS user_id ON reminders TYPE string;
-		DEFINE FIELD IF NOT EXISTS text ON reminders TYPE string;
-		DEFINE FIELD IF NOT EXISTS due_at ON reminders TYPE int;
-		DEFINE FIELD IF NOT EXISTS created_at ON reminders TYPE int;
+		// -- Recent Messages --
+		"DEFINE FIELD IF NOT EXISTS user_id ON recent_messages TYPE string",
+		"DEFINE FIELD IF NOT EXISTS role ON recent_messages TYPE string",
+		"DEFINE FIELD IF NOT EXISTS text ON recent_messages TYPE string",
+		"DEFINE FIELD IF NOT EXISTS timestamp ON recent_messages TYPE int",
 
-	// Define schema for bot state
-		DEFINE TABLE IF NOT EXISTS bot_state SCHEMAFULL;
-		DEFINE FIELD IF NOT EXISTS value ON bot_state TYPE string;
-		DEFINE FIELD IF NOT EXISTS updated_at ON bot_state TYPE int;
+		// -- Reminders --
+		"DEFINE FIELD IF NOT EXISTS user_id ON reminders TYPE string",
+		"DEFINE FIELD IF NOT EXISTS text ON reminders TYPE string",
+		"DEFINE FIELD IF NOT EXISTS due_at ON reminders TYPE int",
+		"DEFINE FIELD IF NOT EXISTS created_at ON reminders TYPE int",
 
-	// Define schema for pending DMs (Duolingo-style tracking)
-		DEFINE TABLE IF NOT EXISTS pending_dm SCHEMAFULL;
-		DEFINE FIELD IF NOT EXISTS user_id ON pending_dm TYPE string;
-		DEFINE FIELD IF NOT EXISTS sent_at ON pending_dm TYPE int;
+		// -- Bot State --
+		"DEFINE FIELD IF NOT EXISTS value ON bot_state TYPE string",
+		"DEFINE FIELD IF NOT EXISTS updated_at ON bot_state TYPE int",
 
-	// Add affection field to user_profiles (for affection system)
-		DEFINE FIELD IF NOT EXISTS affection ON user_profiles TYPE option<int>;
-	`
-	_, err := s.client.Query(query, map[string]interface{}{})
-	return err
+		// -- Pending DM --
+		"DEFINE FIELD IF NOT EXISTS user_id ON pending_dm TYPE string",
+		"DEFINE FIELD IF NOT EXISTS sent_at ON pending_dm TYPE int",
+
+		// -- Migrations --
+		"UPDATE user_profiles SET last_interaction = 0 WHERE last_interaction IS NONE",
+		"UPDATE user_profiles SET affection = 0 WHERE affection IS NONE",
+	}
+
+	for _, q := range queries {
+		if _, err := s.client.Query(q, map[string]interface{}{}); err != nil {
+			// Log warning but continue, as "already exists" is a common harmless error here
+			// fmt.Printf("Init Warning: %v (Query: %s)\n", err, q)
+		}
+	}
+	return nil
 }
 
 // Emoji Cache
@@ -767,29 +778,41 @@ func (s *SurrealStore) SetLastInteraction(userID string, timestamp time.Time) er
 
 // Affection System
 
-// GetAffection returns the affection level for a user (0-100)
+// GetAffection returns the affection level for a user (0-10000)
 func (s *SurrealStore) GetAffection(userID string) (int, error) {
-	query := `SELECT affection FROM user_profiles WHERE id = type::thing("user_profiles", $user_id);`
+	// Query by user_id field which is simpler than constructing Record ID
+	query := `SELECT affection FROM user_profiles WHERE user_id = $user_id;`
 	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
 	if err != nil {
+		fmt.Printf("GetAffection Error for %s: %v\n", userID, err)
 		return 0, err
 	}
 
 	rows, ok := result.([]interface{})
 	if !ok || len(rows) == 0 {
+		fmt.Printf("GetAffection: No record found for %s\n", userID)
 		return 0, nil // No record = 0 affection
 	}
 
 	if row, ok := rows[0].(map[string]interface{}); ok {
+		// Log the raw value to debug type issues
+		// fmt.Printf("GetAffection Raw Value for %s: %v\n", userID, row["affection"])
+		
 		switch a := row["affection"].(type) {
 		case float64:
 			return int(a), nil
+		case float32:
+			return int(a), nil
 		case int64:
+			return int(a), nil
+		case uint64:
 			return int(a), nil
 		case int:
 			return a, nil
 		case nil:
 			return 0, nil
+		default:
+			fmt.Printf("GetAffection: Unknown type for %s: %T\n", userID, a)
 		}
 	}
 
@@ -804,13 +827,13 @@ func (s *SurrealStore) AddAffection(userID string, amount int) error {
 		current = 0
 	}
 
-	// Calculate new value, clamped to 0-100
+	// Calculate new value, clamped to 0-10000
 	newValue := current + amount
 	if newValue < 0 {
 		newValue = 0
 	}
-	if newValue > 100 {
-		newValue = 100
+	if newValue > 10000 {
+		newValue = 10000
 	}
 
 	return s.SetAffection(userID, newValue)
