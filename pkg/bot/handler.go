@@ -446,6 +446,16 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	go func() {
 		defer h.wg.Done()
 
+		// Classify if the response is a refusal
+		refusalLabels := []string{"refusal to answer", "normal helpful response"}
+		label, score, err := h.classifierClient.Classify(reply, refusalLabels)
+		isRefusal := err == nil && label == "refusal to answer" && score > 0.8
+
+		if isRefusal {
+			log.Printf("Detected refusal (score: %.2f), skipping memory update", score)
+			return
+		}
+
 		// Add to Rolling Context
 		h.addRecentMessage(m.Author.ID, "user", m.Content)
 		h.addRecentMessage(m.Author.ID, "assistant", reply)
