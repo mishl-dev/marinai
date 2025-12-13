@@ -4,12 +4,23 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 
 	"github.com/surrealdb/surrealdb.go"
 )
 
 type Client struct {
 	db *surrealdb.DB
+}
+
+// identifierRegex ensures that table names and fields only contain alphanumeric characters and underscores
+var identifierRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+
+func validateIdentifier(s string) error {
+	if !identifierRegex.MatchString(s) {
+		return fmt.Errorf("invalid identifier: %s", s)
+	}
+	return nil
 }
 
 func NewClient(host, user, pass, namespace, database string) (*Client, error) {
@@ -87,13 +98,26 @@ func (c *Client) Select(thing string) (interface{}, error) {
 
 // VectorSearch performs a cosine similarity search
 func (c *Client) VectorSearch(table string, vectorField string, queryVector []float32, limit int, filter map[string]interface{}) ([]interface{}, error) {
+	// Validate inputs to prevent SQL injection
+	if err := validateIdentifier(table); err != nil {
+		return nil, err
+	}
+	if err := validateIdentifier(vectorField); err != nil {
+		return nil, err
+	}
+
+	whereClause, err := buildWhereClause(filter)
+	if err != nil {
+		return nil, err
+	}
+
 	query := fmt.Sprintf(`
 		SELECT *, vector::similarity::cosine(%s, $query_vector) AS similarity 
 		FROM %s 
 		WHERE %s 
 		ORDER BY similarity DESC 
 		LIMIT %d;
-	`, vectorField, table, buildWhereClause(filter), limit)
+	`, vectorField, table, whereClause, limit)
 
 	vars := map[string]interface{}{
 		"query_vector": queryVector,
@@ -117,18 +141,23 @@ func (c *Client) VectorSearch(table string, vectorField string, queryVector []fl
 	return rows, nil
 }
 
-func buildWhereClause(filter map[string]interface{}) string {
+func buildWhereClause(filter map[string]interface{}) (string, error) {
 	if len(filter) == 0 {
-		return "true"
+		return "true", nil
 	}
 	clause := ""
 	i := 0
 	for k := range filter {
+		// Validate filter keys
+		if err := validateIdentifier(k); err != nil {
+			return "", err
+		}
+
 		if i > 0 {
 			clause += " AND "
 		}
 		clause += fmt.Sprintf("%s = $%s", k, k)
 		i++
 	}
-	return clause
+	return clause, nil
 }
