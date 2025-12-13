@@ -490,6 +490,18 @@ func (s *SurrealStore) GetAllKnownUsers() ([]string, error) {
 	return []string{}, nil
 }
 
+func (s *SurrealStore) EnsureUser(userId string) error {
+	query := `
+		INSERT INTO user_profiles (id, user_id, facts, last_updated)
+		VALUES (type::thing("user_profiles", $user_id), $user_id, [], time::unix())
+		ON DUPLICATE KEY UPDATE last_updated = time::unix();
+	`
+	_, err := s.client.Query(query, map[string]interface{}{
+		"user_id": userId,
+	})
+	return err
+}
+
 func (s *SurrealStore) DeleteUserData(userId string) error {
 	query := `
 		DELETE memories WHERE user_id = $user_id;

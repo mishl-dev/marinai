@@ -147,6 +147,10 @@ func (m *mockMemoryStore) GetAllKnownUsers() ([]string, error) {
 	return []string{}, nil
 }
 
+func (m *mockMemoryStore) EnsureUser(userID string) error {
+	return nil
+}
+
 func (m *mockMemoryStore) AddReminder(userId string, text string, dueAt int64) error {
 	return nil
 }
