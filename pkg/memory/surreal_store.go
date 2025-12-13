@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"marinai/pkg/surreal"
+	"reflect"
 	"time"
 )
 
@@ -359,11 +360,29 @@ func (s *SurrealStore) GetDueReminders() ([]Reminder, error) {
 				// Handle RecordID object if returned as map
 				if strID, ok := idMap["String"].(string); ok {
 					r.ID = strID
+				} else if table, ok := idMap["Table"].(string); ok {
+					// Handle split Table/ID format
+					if idVal, ok := idMap["ID"].(string); ok {
+						r.ID = table + ":" + idVal
+					}
 				}
 			} else {
-				// Fallback: try to print it if it's something else, or just ignore
-				// SurrealDB Go driver might return specific types for RecordID
-				r.ID = fmt.Sprintf("%v", rowMap["id"])
+				// Check for struct using reflection (common for driver-specific types)
+				val := reflect.ValueOf(rowMap["id"])
+				if val.Kind() == reflect.Struct {
+					// Try to get Table and ID fields
+					tableField := val.FieldByName("Table")
+					idField := val.FieldByName("ID")
+					if tableField.IsValid() && idField.IsValid() {
+						r.ID = fmt.Sprintf("%v:%v", tableField.Interface(), idField.Interface())
+					} else {
+						// Fallback if fields don't match expected names
+						r.ID = fmt.Sprintf("%v", rowMap["id"])
+					}
+				} else {
+					// Fallback
+					r.ID = fmt.Sprintf("%v", rowMap["id"])
+				}
 			}
 
 			if uid, ok := rowMap["user_id"].(string); ok {
