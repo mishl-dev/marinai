@@ -10,7 +10,7 @@ import (
 var SlashCommands = []*discordgo.ApplicationCommand{
 	{
 		Name:        "reset",
-		Description: "Reset your conversation memory with Marin",
+		Description: "Permanently delete all your conversation history and memories",
 	},
 }
 
