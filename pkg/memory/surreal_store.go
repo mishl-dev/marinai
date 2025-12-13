@@ -314,6 +314,29 @@ func (s *SurrealStore) ClearRecentMessages(userId string) error {
 	return err
 }
 
+func (s *SurrealStore) GetAllKnownUsers() ([]string, error) {
+	query := `SELECT user_id FROM user_profiles;`
+	result, err := s.client.Query(query, map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+
+	rows, ok := result.([]interface{})
+	if !ok {
+		return []string{}, nil
+	}
+
+	var users []string
+	for _, row := range rows {
+		if rowMap, ok := row.(map[string]interface{}); ok {
+			if userID, ok := rowMap["user_id"].(string); ok {
+				users = append(users, userID)
+			}
+		}
+	}
+	return users, nil
+}
+
 func (s *SurrealStore) DeleteUserData(userId string) error {
 	query := `
 		DELETE memories WHERE user_id = $user_id;
