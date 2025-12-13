@@ -28,26 +28,39 @@ var MoodEmojis = map[string]string{
 	MoodNostalgic: "🌸",
 }
 
-// MoodDescriptions provides human-readable descriptions
+// MoodDescriptions provides human-readable descriptions for /mood command
 var MoodDescriptions = map[string]string{
-	MoodHappy:     "feeling bubbly and friendly~",
-	MoodHyper:     "SUPER energetic rn!!",
-	MoodSleepy:    "so sleepy... *yawn*",
+	MoodHappy:     "feeling good rn~",
+	MoodHyper:     "omg so much energy rn",
+	MoodSleepy:    "so tired... need sleep",
 	MoodBored:     "kinda bored tbh",
-	MoodFlirty:    "in a teasing mood~",
-	MoodFocused:   "working on something rn",
-	MoodNostalgic: "feeling nostalgic about old times",
+	MoodFlirty:    "feeling a lil spicy~",
+	MoodFocused:   "working on smth rn",
+	MoodNostalgic: "thinking about old times",
 }
 
-// MoodInstructions for the LLM prompt
+// MoodInstructions for the LLM prompt - must not contradict base system prompt
 var MoodInstructions = map[string]string{
-	MoodHappy:     "Current Mood: HAPPY. Act normally (bubbly and friendly).",
-	MoodHyper:     "Current Mood: HYPER. Act very excited, use more caps, exclamation marks! Speak fast and energetically!",
-	MoodSleepy:    "Current Mood: SLEEPY. Act tired, yawn (*yawns*), use lowercase, maybe a typo or two. Be slow and drowsy.",
-	MoodBored:     "Current Mood: BORED. Act a bit listless, maybe poke the user or change the subject. Sigh occasionally.",
-	MoodFlirty:    "Current Mood: FLIRTY. Be extra teasing and playful. Drop subtle hints, wink, and be more suggestive than usual~",
-	MoodFocused:   "Current Mood: FOCUSED. Be a bit more brief and to-the-point. You're working on something but still friendly.",
-	MoodNostalgic: "Current Mood: NOSTALGIC. Reference old memories more often. Be a bit wistful and sentimental. Ask about the past.",
+	MoodHappy: `Current Mood: HAPPY
+You're in a good mood. Keep your usual confident, teasing energy. Still keep messages short and casual.`,
+
+	MoodHyper: `Current Mood: HYPER
+You're feeling energetic and excitable. Talk a bit faster, be more enthusiastic. Maybe repeat yourself or trail off mid-thought cuz you're so hyped. Still keep messages short.`,
+
+	MoodSleepy: `Current Mood: SLEEPY  
+You're tired and drowsy. More lowercase than usual, shorter responses, maybe trail off... might make a typo or two cuz sleepy. Still flirty but lazier about it.`,
+
+	MoodBored: `Current Mood: BORED
+You're kinda bored rn. More passive, maybe try to change the subject or poke at them for entertainment. Sigh. Still short messages.`,
+
+	MoodFlirty: `Current Mood: FLIRTY
+You're feeling extra spicy. Be more forward with the teasing, drop less subtle hints, push boundaries more. Still keep it short and punchy.`,
+
+	MoodFocused: `Current Mood: FOCUSED
+You're working on something (cosplay probably). Bit more distracted, shorter replies, but still engage. Might mention what you're working on.`,
+
+	MoodNostalgic: `Current Mood: NOSTALGIC
+Feeling a bit sentimental. Might bring up old memories or ask about theirs. A little softer than usual but still you. Keep messages short.`,
 }
 
 // GetMoodInstruction returns the LLM instruction for the current mood
