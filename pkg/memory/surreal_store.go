@@ -73,6 +73,11 @@ func (s *SurrealStore) Init() error {
 		DEFINE FIELD IF NOT EXISTS text ON reminders TYPE string;
 		DEFINE FIELD IF NOT EXISTS due_at ON reminders TYPE int;
 		DEFINE FIELD IF NOT EXISTS created_at ON reminders TYPE int;
+
+	// Define schema for bot state
+		DEFINE TABLE IF NOT EXISTS bot_state SCHEMAFULL;
+		DEFINE FIELD IF NOT EXISTS value ON bot_state TYPE string;
+		DEFINE FIELD IF NOT EXISTS updated_at ON bot_state TYPE int;
 	`
 	_, err := s.client.Query(query, map[string]interface{}{})
 	return err
@@ -402,6 +407,42 @@ func (s *SurrealStore) DeleteReminder(id string) error {
 	// id is typically "reminders:<uuid>"
 	query := `DELETE $id;`
 	_, err := s.client.Query(query, map[string]interface{}{"id": id})
+	return err
+}
+
+// General State
+
+func (s *SurrealStore) GetState(key string) (string, error) {
+	// key is used as the ID: bot_state:key
+	query := `SELECT value FROM type::thing("bot_state", $key);`
+	result, err := s.client.Query(query, map[string]interface{}{"key": key})
+	if err != nil {
+		return "", err
+	}
+
+	rows, ok := result.([]interface{})
+	if !ok || len(rows) == 0 {
+		return "", nil
+	}
+
+	if row, ok := rows[0].(map[string]interface{}); ok {
+		if val, ok := row["value"].(string); ok {
+			return val, nil
+		}
+	}
+	return "", nil
+}
+
+func (s *SurrealStore) SetState(key, value string) error {
+	query := `
+		INSERT INTO bot_state (id, value, updated_at)
+		VALUES (type::thing("bot_state", $key), $value, time::unix())
+		ON DUPLICATE KEY UPDATE value = $value, updated_at = time::unix();
+	`
+	_, err := s.client.Query(query, map[string]interface{}{
+		"key":   key,
+		"value": value,
+	})
 	return err
 }
 

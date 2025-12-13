@@ -69,6 +69,10 @@ type Store interface {
 	GetDueReminders() ([]Reminder, error)
 	UpdateReminder(reminder Reminder) error
 	DeleteReminder(id string) error
+
+	// General State
+	GetState(key string) (string, error)
+	SetState(key, value string) error
 }
 
 type FileStore struct {
@@ -336,5 +340,13 @@ func (vs *FileStore) UpdateReminder(reminder Reminder) error {
 }
 
 func (vs *FileStore) DeleteReminder(id string) error {
+	return nil
+}
+
+func (vs *FileStore) GetState(key string) (string, error) {
+	return "", nil
+}
+
+func (vs *FileStore) SetState(key, value string) error {
 	return nil
 }

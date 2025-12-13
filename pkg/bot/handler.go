@@ -94,6 +94,11 @@ type Handler struct {
 	lastGlobalInteraction time.Time
 	lastGlobalMu          sync.RWMutex
 	session               Session
+
+	// Mood System
+	currentMood    string
+	messageCounter int
+	moodMu         sync.RWMutex
 }
 
 func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, m memory.Store, messageProcessingDelay float64, factAgingDays int, factSummarizationThreshold int, maintenanceIntervalHours float64) *Handler {
@@ -111,6 +116,7 @@ func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, m memory.Sto
 		maintenanceInterval:        time.Duration(maintenanceIntervalHours * float64(time.Hour)),
 		activeUsers:                make(map[string]bool),
 		lastGlobalInteraction:      time.Now(), // Initialize with current time so she doesn't feel lonely immediately
+		currentMood:                "HAPPY",    // Default mood
 	}
 
 	// Validate maintenance interval to prevent panic
@@ -118,12 +124,22 @@ func NewHandler(c CerebrasClient, cl Classifier, e EmbeddingClient, m memory.Sto
 		h.maintenanceInterval = 24 * time.Hour
 	}
 
+	// Initialize mood from DB
+	go func() {
+		if storedMood, err := m.GetState("mood"); err == nil && storedMood != "" {
+			h.moodMu.Lock()
+			h.currentMood = storedMood
+			h.moodMu.Unlock()
+		}
+	}()
+
 	// Start background goroutines
 	go h.clearInactiveUsers()
 	go h.maintainMemories()
 	go h.checkForLoneliness()
 	go h.runDailyRoutine()
 	go h.checkReminders()
+	go h.runMoodLoop()
 
 	return h
 }
@@ -251,6 +267,11 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == h.botID {
 		return
 	}
+
+	// Increment message counter for mood logic
+	h.moodMu.Lock()
+	h.messageCounter++
+	h.moodMu.Unlock()
 
 	// Ignore long messages
 	if len(m.Content) > 280 {
@@ -466,7 +487,23 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 		profileText = "- " + strings.Join(facts, "\n- ")
 	}
 
-	systemPrompt := fmt.Sprintf(SystemPrompt, displayName, profileText)
+	h.moodMu.RLock()
+	mood := h.currentMood
+	h.moodMu.RUnlock()
+
+	moodInstruction := ""
+	switch mood {
+	case "HYPER":
+		moodInstruction = "Current Mood: HYPER. Act very excited, use more caps, exclamation marks, and emojis! Speak fast!"
+	case "SLEEPY":
+		moodInstruction = "Current Mood: SLEEPY. Act tired, yawn ( *yawns* ), use lowercase, maybe a typo or two. Be slow."
+	case "BORED":
+		moodInstruction = "Current Mood: BORED. Act a bit listless, maybe poke the user or change the subject. Sigh."
+	default:
+		moodInstruction = "Current Mood: HAPPY. Act normally (bubbly and friendly)."
+	}
+
+	systemPrompt := fmt.Sprintf("%s\n\n%s", fmt.Sprintf(SystemPrompt, displayName, profileText), moodInstruction)
 	messages := []cerebras.Message{
 		{Role: "system", Content: systemPrompt},
 	}
@@ -885,6 +922,47 @@ func (h *Handler) evaluateReaction(s Session, channelID, messageID, content stri
 		if err := s.MessageReactionAdd(channelID, messageID, emoji); err != nil {
 			log.Printf("Error adding reaction: %v", err)
 		}
+	}
+}
+
+func (h *Handler) runMoodLoop() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		h.moodMu.Lock()
+		rate := h.messageCounter
+		h.messageCounter = 0 // Reset counter
+		h.moodMu.Unlock()
+
+		// Determine time
+		loc := time.FixedZone("Asia/Tokyo", 9*60*60)
+		now := time.Now().In(loc)
+		hour := now.Hour()
+
+		newMood := "HAPPY"
+
+		// Mood Logic
+		if rate > 20 {
+			newMood = "HYPER"
+		} else if hour < 7 || hour >= 23 {
+			newMood = "SLEEPY"
+		} else if rate < 1 && hour > 10 && hour < 20 {
+			newMood = "BORED"
+		}
+
+		h.moodMu.Lock()
+		if h.currentMood != newMood {
+			h.currentMood = newMood
+			// Async save to avoid blocking loop
+			go func(mood string) {
+				if err := h.memoryStore.SetState("mood", mood); err != nil {
+					log.Printf("Error saving mood: %v", err)
+				}
+			}(newMood)
+			log.Printf("Mood changed to: %s (Rate: %d, Hour: %d)", newMood, rate, hour)
+		}
+		h.moodMu.Unlock()
 	}
 }
 

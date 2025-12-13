@@ -163,6 +163,14 @@ func (m *mockMemoryStore) DeleteReminder(id string) error {
 	return nil
 }
 
+func (m *mockMemoryStore) GetState(key string) (string, error) {
+	return "", nil
+}
+
+func (m *mockMemoryStore) SetState(key, value string) error {
+	return nil
+}
+
 // Mock Discord Session
 type mockDiscordSession struct {
 	ChannelMessageSendFunc        func(channelID string, content string, options ...discordgo.RequestOption) (*discordgo.Message, error)
