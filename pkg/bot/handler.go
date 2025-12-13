@@ -478,6 +478,7 @@ func (h *Handler) extractMemories(userId string, userName string, userMessage st
 		"i have", "i've", // Possession/Experience
 		"don't like", "dislike", // Negative preferences
 		"name is", "call me", // Naming
+		"remember", // Explicit instructions
 	}
 
 	hasTrigger := false

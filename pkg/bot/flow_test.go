@@ -248,7 +248,7 @@ func TestMessageFlow(t *testing.T) {
 			}
 			promptBuilder.WriteString(fmt.Sprintf("[%s]\n%s\n", role, msg.Content))
 
-			if strings.Contains(msg.Content, "Task: Analyze the interaction and update the user's profile") {
+			if strings.Contains(msg.Content, "Task: Analyze the interaction and output a JSON object with") {
 				isMemoryEvaluation = true
 			}
 		}
