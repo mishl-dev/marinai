@@ -321,27 +321,9 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	go func() {
 		defer gatherWg.Done()
 		if channel != nil && channel.GuildID != "" {
-			emojis, err := s.GuildEmojis(channel.GuildID)
-			if err == nil && len(emojis) > 0 {
-				relevantNames := h.filterRelevantEmojis(channel.GuildID, emojis)
-
-				if len(relevantNames) > 0 {
-					nameToEmoji := make(map[string]*discordgo.Emoji)
-					for _, emoji := range emojis {
-						nameToEmoji[emoji.Name] = emoji
-					}
-
-					var emojiList []string
-					for _, name := range relevantNames {
-						if emoji, ok := nameToEmoji[name]; ok {
-							emojiList = append(emojiList, fmt.Sprintf("<:%s:%s>", emoji.Name, emoji.ID))
-						}
-					}
-
-					if len(emojiList) > 0 {
-						emojiText = "Available custom emojis:\n" + strings.Join(emojiList, ", ")
-					}
-				}
+			emojiList := h.getRelevantEmojis(channel.GuildID, s)
+			if len(emojiList) > 0 {
+				emojiText = "Available custom emojis:\n" + strings.Join(emojiList, ", ")
 			}
 		}
 	}()
