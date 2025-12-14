@@ -97,24 +97,65 @@ func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 	// Get facts about the user
 	facts, err := h.memoryStore.GetFacts(userID)
 
-	var responseContent string
 	if err != nil {
 		log.Printf("Error getting facts for user %s: %v", userID, err)
-		responseContent = "Hmm, I had trouble checking my notes... Try again?"
-	} else if len(facts) == 0 {
-		responseContent = fmt.Sprintf("I don't have any notes about you yet, %s! 📝\n\nChat with me more and I'll start remembering things~", userName)
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Hmm, I had trouble checking my notes... Try again?",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	var embed *discordgo.MessageEmbed
+
+	if len(facts) == 0 {
+		embed = &discordgo.MessageEmbed{
+			Title:       fmt.Sprintf("📝 Memory File: %s", userName),
+			Description: "I don't have any specific notes about you yet! Chat with me more and I'll start remembering things~",
+			Color:       0x00BFFF, // Deep Sky Blue
+		}
 	} else {
 		// Format facts nicely
 		factList := "• " + strings.Join(facts, "\n• ")
-		responseContent = fmt.Sprintf("**📝 What I remember about %s:**\n\n%s\n\n*Use /reset if you want me to forget everything!*", userName, factList)
+
+		// If factList is too long for one field (1024 chars), truncate safely
+		if len(factList) > 1024 {
+			// Convert to runes to safely slice multi-byte characters (like emojis)
+			runes := []rune(factList)
+			// Discord limit is 1024 characters, but we need room for "..."
+			// However, Discord counts characters, not bytes (mostly).
+			// To be safe against byte limits, we'll keep it under 1000 characters.
+			if len(runes) > 1021 {
+				factList = string(runes[:1021]) + "..."
+			}
+		}
+
+		embed = &discordgo.MessageEmbed{
+			Title:       fmt.Sprintf("📝 Memory File: %s", userName),
+			Description: "Here's everything I've noted down about you so far!",
+			Color:       0x00BFFF, // Deep Sky Blue
+			Fields: []*discordgo.MessageEmbedField{
+				{
+					Name:   "Observations",
+					Value:  factList,
+					Inline: false,
+				},
+			},
+			Footer: &discordgo.MessageEmbedFooter{
+				Text: "To start fresh, use /reset",
+			},
+		}
 	}
 
 	// Respond to the interaction
 	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: responseContent,
-			Flags:   discordgo.MessageFlagsEphemeral,
+			Embeds: []*discordgo.MessageEmbed{embed},
+			Flags:  discordgo.MessageFlagsEphemeral,
 		},
 	})
 
