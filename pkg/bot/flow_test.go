@@ -226,6 +226,22 @@ func (m *mockMemoryStore) SetAffection(userID string, amount int) error {
 	return nil
 }
 
+func (m *mockMemoryStore) GetStreak(userID string) (int, error) {
+	return 0, nil
+}
+
+func (m *mockMemoryStore) UpdateStreak(userID string) (int, bool) {
+	return 0, false
+}
+
+func (m *mockMemoryStore) GetFirstInteraction(userID string) (time.Time, error) {
+	return time.Time{}, nil
+}
+
+func (m *mockMemoryStore) SetFirstInteraction(userID string, timestamp time.Time) error {
+	return nil
+}
+
 // Mock Discord Session
 type mockDiscordSession struct {
 	ChannelMessageSendFunc        func(channelID string, content string, options ...discordgo.RequestOption) (*discordgo.Message, error)

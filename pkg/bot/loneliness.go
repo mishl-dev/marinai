@@ -21,8 +21,8 @@ func (h *Handler) checkForLoneliness() {
 // performLonelinessCheck is separated for testing
 // Uses Duolingo-style logic: won't DM a user if they haven't responded to the last one
 func (h *Handler) performLonelinessCheck() bool {
-	// Per-user inactivity threshold: 2 days without interaction
-	const inactivityThreshold = 48 * time.Hour
+	// Per-user inactivity threshold: 1 day without interaction
+	const inactivityThreshold = 24 * time.Hour
 	// Global loneliness threshold: only check when globally lonely (no interaction for 4 hours)
 	const lonelinessThreshold = 4 * time.Hour
 
@@ -95,6 +95,11 @@ func (h *Handler) performLonelinessCheck() bool {
 		profileText = "- " + strings.Join(facts, "\n- ")
 	}
 
+	// Get relationship context
+	affection, _ := h.memoryStore.GetAffection(targetUserID)
+	relationshipInstruction := GetAffectionInstruction(affection)
+	level := GetAffectionLevel(affection)
+
 	// Get display name
 	user, err := h.session.User(targetUserID)
 	userName := "User"
@@ -108,10 +113,14 @@ func (h *Handler) performLonelinessCheck() bool {
 	prompt := fmt.Sprintf(`You are Marin Kitagawa. You haven't talked to anyone in a while and you feel a bit lonely/bored.
 You decide to text one of your friends, %s.
 
+%s
+
 Things you remember about %s:
 %s
 
-Write a short, casual, friendly message to them to start a conversation.
+Your relationship with them: %s %s
+
+Write a short, casual message to them to start a conversation. Your tone should match your relationship level - be more reserved with strangers, more playful/flirty with close friends or special someones.
 
 IMPORTANT INSTRUCTIONS:
 - If you know specific facts about them (like their job, hobbies, what they're working on), reference those! Ask how it's going.
@@ -122,10 +131,18 @@ IMPORTANT INSTRUCTIONS:
 - Do NOT say "User Profile" or "System" or mention that you're an AI.
 - Do NOT be overly formal or use phrases like "I hope this message finds you well".
 
-Just output the message, nothing else.`, userName, userName, profileText)
+Discord Chat Style:
+- Keep messages SHORT and natural. like you're actually texting
+- mostly lowercase, casual typing
+- you can be thoughtful or chill, but you default to playful and suggestive
+- tease friends in a way that makes them flustered—that's your entertainment
+- rarely use emojis. when you do, keep it simple
+- no roleplay actions like *does something*
+
+Just output the message, nothing else.`, userName, relationshipInstruction, userName, profileText, level.Emoji, level.Name)
 
 	messages := []cerebras.Message{
-		{Role: "system", Content: "You are Marin Kitagawa, a friendly cosplayer who texts like a real person. Be casual and natural."},
+		{Role: "system", Content: "You are Marin Kitagawa, a friendly cosplayer who texts like a real person. Be casual and natural. Adjust your tone based on how close you are to the person."},
 		{Role: "user", Content: prompt},
 	}
 

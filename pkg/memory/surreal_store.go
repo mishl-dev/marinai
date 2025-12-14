@@ -65,7 +65,10 @@ func (s *SurrealStore) Init() error {
 		"DEFINE FIELD IF NOT EXISTS last_updated ON user_profiles TYPE int",
 		// We use int DEFAULT 0 to avoid NONE issues
 		"DEFINE FIELD IF NOT EXISTS last_interaction ON user_profiles TYPE int DEFAULT 0",
+		"DEFINE FIELD IF NOT EXISTS first_interaction ON user_profiles TYPE int DEFAULT 0",
 		"DEFINE FIELD IF NOT EXISTS affection ON user_profiles TYPE int DEFAULT 0",
+		"DEFINE FIELD IF NOT EXISTS streak ON user_profiles TYPE int DEFAULT 0",
+		"DEFINE FIELD IF NOT EXISTS last_streak_date ON user_profiles TYPE string DEFAULT ''",
 
 		// -- Guild Cache --
 		"DEFINE FIELD IF NOT EXISTS emojis ON guild_cache TYPE array<string>",
@@ -93,7 +96,10 @@ func (s *SurrealStore) Init() error {
 
 		// -- Migrations --
 		"UPDATE user_profiles SET last_interaction = 0 WHERE last_interaction IS NONE",
+		"UPDATE user_profiles SET first_interaction = 0 WHERE first_interaction IS NONE",
 		"UPDATE user_profiles SET affection = 0 WHERE affection IS NONE",
+		"UPDATE user_profiles SET streak = 0 WHERE streak IS NONE",
+		"UPDATE user_profiles SET last_streak_date = '' WHERE last_streak_date IS NONE",
 	}
 
 	for _, q := range queries {
@@ -819,7 +825,7 @@ func (s *SurrealStore) GetAffection(userID string) (int, error) {
 	return 0, nil
 }
 
-// AddAffection adds to the user's affection level (clamped to 0-100)
+// AddAffection adds to the user's affection level (clamped to 0-100000)
 func (s *SurrealStore) AddAffection(userID string, amount int) error {
 	// Get current affection
 	current, err := s.GetAffection(userID)
@@ -827,13 +833,13 @@ func (s *SurrealStore) AddAffection(userID string, amount int) error {
 		current = 0
 	}
 
-	// Calculate new value, clamped to 0-10000
+	// Calculate new value, clamped to 0-100000
 	newValue := current + amount
 	if newValue < 0 {
 		newValue = 0
 	}
-	if newValue > 10000 {
-		newValue = 10000
+	if newValue > 100000 {
+		newValue = 100000
 	}
 
 	return s.SetAffection(userID, newValue)
@@ -841,12 +847,12 @@ func (s *SurrealStore) AddAffection(userID string, amount int) error {
 
 // SetAffection sets the user's affection level directly
 func (s *SurrealStore) SetAffection(userID string, amount int) error {
-	// Clamp to 0-10000
+	// Clamp to 0-100000
 	if amount < 0 {
 		amount = 0
 	}
-	if amount > 10000 {
-		amount = 10000
+	if amount > 100000 {
+		amount = 100000
 	}
 
 	query := `
@@ -861,3 +867,153 @@ func (s *SurrealStore) SetAffection(userID string, amount int) error {
 	return err
 }
 
+// ==========================================
+// STREAK SYSTEM
+// ==========================================
+
+// GetStreak returns the current streak for a user
+func (s *SurrealStore) GetStreak(userID string) (int, error) {
+	query := `SELECT streak FROM user_profiles WHERE user_id = $user_id;`
+	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
+	if err != nil {
+		return 0, err
+	}
+
+	rows, ok := result.([]interface{})
+	if !ok || len(rows) == 0 {
+		return 0, nil
+	}
+
+	if row, ok := rows[0].(map[string]interface{}); ok {
+		switch a := row["streak"].(type) {
+		case float64:
+			return int(a), nil
+		case int64:
+			return int(a), nil
+		case int:
+			return a, nil
+		case nil:
+			return 0, nil
+		}
+	}
+
+	return 0, nil
+}
+
+// UpdateStreak updates the user's daily streak
+// Returns (new streak count, whether streak was broken)
+func (s *SurrealStore) UpdateStreak(userID string) (int, bool) {
+	today := time.Now().Format("2006-01-02")
+
+	// Get current streak info
+	query := `SELECT streak, last_streak_date FROM user_profiles WHERE user_id = $user_id;`
+	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
+	if err != nil {
+		return 0, false
+	}
+
+	var currentStreak int
+	var lastDate string
+
+	rows, ok := result.([]interface{})
+	if ok && len(rows) > 0 {
+		if row, ok := rows[0].(map[string]interface{}); ok {
+			switch a := row["streak"].(type) {
+			case float64:
+				currentStreak = int(a)
+			case int64:
+				currentStreak = int(a)
+			case int:
+				currentStreak = a
+			}
+			if d, ok := row["last_streak_date"].(string); ok {
+				lastDate = d
+			}
+		}
+	}
+
+	// If already updated today, return current streak
+	if lastDate == today {
+		return currentStreak, false
+	}
+
+	// Check if streak continues or breaks
+	streakBroken := false
+	newStreak := 1
+
+	if lastDate != "" {
+		lastStreakTime, err := time.Parse("2006-01-02", lastDate)
+		if err == nil {
+			daysSince := int(time.Since(lastStreakTime).Hours() / 24)
+			if daysSince == 1 {
+				// Streak continues!
+				newStreak = currentStreak + 1
+			} else if daysSince > 1 {
+				// Streak broken
+				streakBroken = true
+				newStreak = 1
+			}
+		}
+	}
+
+	// Update streak in database
+	updateQuery := `
+		INSERT INTO user_profiles (id, user_id, facts, last_updated, streak, last_streak_date)
+		VALUES (type::thing("user_profiles", $user_id), $user_id, [], time::unix(), $streak, $date)
+		ON DUPLICATE KEY UPDATE streak = $streak, last_streak_date = $date, last_updated = time::unix();
+	`
+	s.client.Query(updateQuery, map[string]interface{}{
+		"user_id": userID,
+		"streak":  newStreak,
+		"date":    today,
+	})
+
+	return newStreak, streakBroken
+}
+
+// GetFirstInteraction returns when the user first interacted with the bot
+func (s *SurrealStore) GetFirstInteraction(userID string) (time.Time, error) {
+	query := `SELECT first_interaction FROM user_profiles WHERE user_id = $user_id;`
+	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	rows, ok := result.([]interface{})
+	if !ok || len(rows) == 0 {
+		return time.Time{}, nil
+	}
+
+	if row, ok := rows[0].(map[string]interface{}); ok {
+		var timestamp int64
+		switch t := row["first_interaction"].(type) {
+		case float64:
+			timestamp = int64(t)
+		case int64:
+			timestamp = t
+		case int:
+			timestamp = int64(t)
+		case nil:
+			return time.Time{}, nil
+		}
+		if timestamp > 0 {
+			return time.Unix(timestamp, 0), nil
+		}
+	}
+
+	return time.Time{}, nil
+}
+
+// SetFirstInteraction sets the user's first interaction timestamp (only if not already set)
+func (s *SurrealStore) SetFirstInteraction(userID string, timestamp time.Time) error {
+	// Only set if not already set (first_interaction == 0)
+	query := `
+		UPDATE user_profiles SET first_interaction = $timestamp
+		WHERE user_id = $user_id AND (first_interaction IS NONE OR first_interaction = 0);
+	`
+	_, err := s.client.Query(query, map[string]interface{}{
+		"user_id":   userID,
+		"timestamp": timestamp.Unix(),
+	})
+	return err
+}

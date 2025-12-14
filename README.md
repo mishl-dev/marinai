@@ -34,22 +34,54 @@ Built with love using Go, Cerebras AI for ultra-fast inference, and SurrealDB fo
 - **Duplicate detection** — Smart deduplication prevents redundant memories
 
 ### 💕 Affection System
-A sophisticated relationship system inspired by dating sims:
+A sophisticated relationship system inspired by dating sims with **100,000 XP** max progression and **10 relationship levels**:
 
 | Level | XP Range | Description |
 |-------|----------|-------------|
-| 👋 Stranger | 0 - 999 | Just met |
-| 🙂 Acquaintance | 1,000 - 2,499 | Starting to recognize you |
-| 😊 Friend | 2,500 - 4,999 | Comfortable and casual |
-| 💕 Close Friend | 5,000 - 7,499 | Sharing personal things |
-| 💗 Best Friend | 7,500 - 8,999 | No barriers |
-| ❤️ Special Someone | 9,000 - 10,000 | Maximum affection |
+| 👋 Stranger | 0 - 4,999 | Just met |
+| 👀 Familiar Face | 5,000 - 9,999 | Seen around |
+| 🙂 Acquaintance | 10,000 - 19,999 | Starting to know you |
+| 😊 Casual Friend | 20,000 - 34,999 | Hang out sometimes |
+| 😄 Friend | 35,000 - 49,999 | Actual friends |
+| 🤗 Good Friend | 50,000 - 64,999 | Genuinely close |
+| 💕 Close Friend | 65,000 - 79,999 | Deep trust |
+| 💗 Best Friend | 80,000 - 89,999 | No barriers |
+| 💖 Soulmate | 90,000 - 97,499 | Deep connection |
+| ❤️‍🔥 Special Someone | 97,500 - 100,000 | In love |
 
-**How it works:**
-- Affection increases through positive interactions (compliments, long conversations, being supportive)
-- Affection decreases from negative behaviors (being rude, dismissive, or ignoring her)
-- Natural decay over time if you don't interact (but closer relationships decay slower!)
-- Marin's personality adapts based on your relationship level
+#### 🔥 Daily Streaks
+- Interact every day to build a streak (up to **2x XP bonus** at 30+ days!)
+- Missing a day resets your streak with a small penalty
+- Streak displayed in `/affection` command
+
+#### 🎯 Mood Multipliers
+Your affection gains are affected by Marin's current mood:
+- **Flirty** (1.5x) — Compliments and flirting worth more
+- **Hyper** (1.2x) — Everything feels more meaningful
+- **Playful** (1.3x) — Teasing and jokes rewarded
+- **Bored** (0.6x) — Harder to impress
+
+#### 🏆 Milestone Events
+When you level up, Marin sends you a special DM with:
+- A heartfelt message acknowledging your bond
+- Personal secrets she only shares with close friends
+
+#### 💚 Jealousy System
+If you're active in a server but haven't talked to Marin in 3+ days:
+- She notices and gets a little jealous
+- You might receive a passive-aggressive comment
+- Small affection penalty until you make it up to her
+
+#### ✨ Random Events
+5% chance per message of triggering a "heart moment":
+- Bonus affection from random thoughts Marin has about you
+- Messages like *"wait... my heart just did a thing 💕"*
+
+#### 🎁 Hidden Bonuses
+- **Shared interests** — Talking about cosplay, anime, etc. gives extra XP
+- **Late night chats** (11 PM - 4 AM) — More intimate conversations
+- **DM conversations** — Worth more than public channels
+- **Anniversary tracking** — Special messages on milestones (7 days, 30 days, 1 year, etc.)
 
 ### 🎭 Dynamic Moods
 Marin has different moods that cycle naturally and affect her responses:
@@ -72,10 +104,30 @@ Marin has different moods that cycle naturally and affect her responses:
 - Personality-appropriate emoji selection
 
 ### 💌 Boredom DMs (Duolingo-style)
-- If you haven't talked to Marin in 2+ days, she might DM you
+- If you haven't talked to Marin in 1+ day, she might DM you
 - "hey... haven't heard from you in a while..."
 - Won't spam — only one pending DM at a time
 - Responding to her DM gives bonus affection!
+
+### 🧠 Agency System (NEW!)
+Marin has her own **internal state** that makes her feel alive:
+
+#### 💭 Proactive Thoughts
+- Marin thinks about close friends and reaches out unprompted
+- Higher affection = higher chance of random messages
+- Messages reference what she's currently doing/thinking
+
+#### 📓 Personal Journal
+- Marin has her own activities, projects, and thoughts
+- **Current Activity**: "working on a cosplay", "watching anime", etc.
+- **Current Project**: "Miku cosplay", "a bunny girl costume", etc.
+- **On Her Mind**: Random thoughts that influence conversations
+- These shift over time (every 30 minutes)
+
+#### 🎭 State-Aware Responses
+- Marin references her current activity in conversations
+- Her mood is influenced by how recent interactions went
+- Creates a sense of continuity and presence
 
 ### ⏰ Reminders
 - Set reminders that Marin will deliver

@@ -181,8 +181,9 @@ func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.Inter
 	}
 
 	affection, level := h.GetUserAffection(userID)
+	streak, _ := h.memoryStore.GetStreak(userID)
 
-	responseContent := fmt.Sprintf("**💕 Relationship with %s**\n\n%s", userName, FormatAffectionDisplay(affection))
+	responseContent := fmt.Sprintf("**💕 Relationship with %s**\n\n%s", userName, FormatAffectionDisplay(affection, streak))
 
 	// Add flavor text based on level
 	switch level.Name {
@@ -212,6 +213,7 @@ func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.Inter
 		log.Printf("Error responding to affection command: %v", err)
 	}
 }
+
 
 // InteractionCreate handles all slash command interactions
 func (h *Handler) InteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {

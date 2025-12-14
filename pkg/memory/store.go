@@ -87,6 +87,12 @@ type Store interface {
 	GetAffection(userID string) (int, error)
 	AddAffection(userID string, amount int) error
 	SetAffection(userID string, amount int) error
+
+	// Streak System
+	GetStreak(userID string) (int, error)
+	UpdateStreak(userID string) (int, bool) // Returns (new streak, broke streak)
+	GetFirstInteraction(userID string) (time.Time, error)
+	SetFirstInteraction(userID string, timestamp time.Time) error
 }
 
 type FileStore struct {
@@ -409,3 +415,20 @@ func (vs *FileStore) SetAffection(userID string, amount int) error {
 	return nil
 }
 
+// Streak System (FileStore stubs)
+
+func (vs *FileStore) GetStreak(userID string) (int, error) {
+	return 0, nil
+}
+
+func (vs *FileStore) UpdateStreak(userID string) (int, bool) {
+	return 0, false
+}
+
+func (vs *FileStore) GetFirstInteraction(userID string) (time.Time, error) {
+	return time.Time{}, nil
+}
+
+func (vs *FileStore) SetFirstInteraction(userID string, timestamp time.Time) error {
+	return nil
+}

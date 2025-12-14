@@ -85,6 +85,7 @@ func NewHandler(c CerebrasClient, e EmbeddingClient, g GeminiClient, m memory.St
 	go h.runMoodLoop()
 	go h.cleanupLoop()
 	go h.runAffectionDecayLoop()
+	go h.runProactiveThoughtsLoop() // Agency: proactive thoughts to close friends
 
 	return h
 }
@@ -223,8 +224,39 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 		return
 	}
 
+	// Get current mood for affection multiplier
+	h.moodMu.RLock()
+	currentMoodForAffection := h.currentMood
+	h.moodMu.RUnlock()
+
+	// Update streak and set first interaction date
+	go func() {
+		// Update daily streak
+		h.memoryStore.UpdateStreak(m.Author.ID)
+		// Set first interaction if not already set
+		h.memoryStore.SetFirstInteraction(m.Author.ID, time.Now())
+	}()
+
 	// Calculate affection changes in background (don't block reply)
-	go h.UpdateAffectionForMessage(m.Author.ID, m.Content, isMentioned, isDM, false)
+	// Store milestone/event messages to potentially include in reply
+	go func() {
+		_, milestoneMsg, randomEventMsg := h.UpdateAffectionForMessage(m.Author.ID, m.Content, isMentioned, isDM, false, currentMoodForAffection)
+		
+		// If there's a milestone or random event, send it as a follow-up DM
+		if milestoneMsg != "" || randomEventMsg != "" {
+			// Create a DM channel
+			dmChannel, err := s.UserChannelCreate(m.Author.ID)
+			if err == nil && dmChannel != nil {
+				if milestoneMsg != "" {
+					s.ChannelMessageSend(dmChannel.ID, milestoneMsg)
+				}
+				if randomEventMsg != "" && milestoneMsg == "" {
+					// Only send random event if no milestone (to avoid spam)
+					s.ChannelMessageSend(dmChannel.ID, randomEventMsg)
+				}
+			}
+		}
+	}()
 
 	// Prepare display name
 	displayName := m.Author.Username
@@ -371,8 +403,9 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	h.moodMu.RUnlock()
 
 	moodInstruction := GetMoodInstruction(mood)
+	statePrompt := h.GetStateForPrompt() // Marin's current internal state
 
-	systemPrompt := fmt.Sprintf("%s\n\n%s", fmt.Sprintf(SystemPrompt, displayName, profileText), moodInstruction)
+	systemPrompt := fmt.Sprintf("%s\n\n%s\n\n%s", fmt.Sprintf(SystemPrompt, displayName, profileText), moodInstruction, statePrompt)
 	messages := []cerebras.Message{
 		{Role: "system", Content: systemPrompt},
 	}
