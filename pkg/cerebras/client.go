@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 )
 
 const (
@@ -79,8 +80,10 @@ func NewClient(apiKey string, temperature, topP float64, models []ModelConfig) *
 		models = PrioritizedModels
 	}
 	return &Client{
-		apiKey:      apiKey,
-		client:      &http.Client{},
+		apiKey: apiKey,
+		client: &http.Client{
+			Timeout: 120 * time.Second,
+		},
 		temperature: temperature,
 		topP:        topP,
 		models:      models,
