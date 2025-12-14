@@ -44,6 +44,14 @@ type Handler struct {
 	moodMu         sync.RWMutex
 }
 
+type MessageContext struct {
+	RecentMessages []memory.RecentMessageItem
+	Matches        []string
+	Facts          []string
+	EmojiText      string
+	ImageContext   string
+}
+
 func NewHandler(c CerebrasClient, e EmbeddingClient, g GeminiClient, m memory.Store, messageProcessingDelay float64, factAgingDays int, factSummarizationThreshold int, maintenanceIntervalHours float64) *Handler {
 	h := &Handler{
 		cerebrasClient:             c,
@@ -282,81 +290,18 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	}
 
 	// Parallelize data gathering to reduce latency
-	var (
-		recentMsgs   []memory.RecentMessageItem
-		matches      []string
-		facts        []string
-		emojiText    string
-		imageContext string
-	)
-
-	var gatherWg sync.WaitGroup
-	gatherWg.Add(5)
-
-	// 1. Recent Context
-	go func() {
-		defer gatherWg.Done()
-		recentMsgs = h.getRecentMessages(m.Author.ID)
-	}()
-
-	// 2. Search Memory (RAG)
-	go func() {
-		defer gatherWg.Done()
-		// Generate Embedding for current message
-		emb, err := h.embeddingClient.Embed(m.Content)
-		if err != nil {
-			log.Printf("Error generating embedding: %v", err)
-			return
-		}
-		if emb != nil {
-			var err error
-			matches, err = h.memoryStore.Search(m.Author.ID, emb, 5) // Top 5 relevant memories
-			if err != nil {
-				log.Printf("Error searching memory: %v", err)
-			}
-		}
-	}()
-
-	// 3. Emojis
-	go func() {
-		defer gatherWg.Done()
-		if channel != nil && channel.GuildID != "" {
-			emojiList := h.getRelevantEmojis(channel.GuildID, s)
-			if len(emojiList) > 0 {
-				emojiText = "Available custom emojis:\n" + strings.Join(emojiList, ", ")
-			}
-		}
-	}()
-
-	// 4. Fetch User Profile
-	go func() {
-		defer gatherWg.Done()
-		var err error
-		facts, err = h.memoryStore.GetFacts(m.Author.ID)
-		if err != nil {
-			log.Printf("Error fetching user profile: %v", err)
-		}
-	}()
-
-	// 5. Process Image Attachments (if any)
-	go func() {
-		defer gatherWg.Done()
-		imageContext = h.processImageAttachments(m.Attachments)
-	}()
-
-	// Wait for all data
-	gatherWg.Wait()
+	ctx := h.gatherMessageContext(s, m.Author.ID, m.Content, channel, m.Attachments)
 
 	// Prepare strings from gathered data
 	var retrievedMemories string
-	if len(matches) > 0 {
-		retrievedMemories = "Relevant past memories:\n- " + strings.Join(matches, "\n- ")
+	if len(ctx.Matches) > 0 {
+		retrievedMemories = "Relevant past memories:\n- " + strings.Join(ctx.Matches, "\n- ")
 	}
 
 	var rollingContext string
-	if len(recentMsgs) > 0 {
+	if len(ctx.RecentMessages) > 0 {
 		var contextLines []string
-		for _, msg := range recentMsgs {
+		for _, msg := range ctx.RecentMessages {
 			// Reconstruct "Name: Content" format based on role
 			content := msg.Text
 			switch msg.Role {
@@ -376,8 +321,8 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	}
 
 	profileText := "No known facts yet."
-	if len(facts) > 0 {
-		profileText = "- " + strings.Join(facts, "\n- ")
+	if len(ctx.Facts) > 0 {
+		profileText = "- " + strings.Join(ctx.Facts, "\n- ")
 	}
 
 	h.moodMu.RLock()
@@ -399,19 +344,19 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	if rollingContext != "" {
 		messages = append(messages, cerebras.Message{Role: "system", Content: rollingContext})
 	}
-	if emojiText != "" {
-		messages = append(messages, cerebras.Message{Role: "system", Content: emojiText})
+	if ctx.EmojiText != "" {
+		messages = append(messages, cerebras.Message{Role: "system", Content: ctx.EmojiText})
 	}
 
 	// Build user message with image context if present
 	userMessage := m.Content
-	if imageContext != "" {
+	if ctx.ImageContext != "" {
 		if userMessage == "" {
-			userMessage = imageContext
+			userMessage = ctx.ImageContext
 		} else {
-			userMessage = imageContext + "\n" + userMessage
+			userMessage = ctx.ImageContext + "\n" + userMessage
 		}
-		log.Printf("Image context added: %s", imageContext)
+		log.Printf("Image context added: %s", ctx.ImageContext)
 	}
 
 	messages = append(messages, cerebras.Message{Role: "user", Content: userMessage})
@@ -445,7 +390,66 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	}()
 }
 
+// gatherMessageContext gathers all necessary context data in parallel
+func (h *Handler) gatherMessageContext(s Session, userID, content string, channel *discordgo.Channel, attachments []*discordgo.MessageAttachment) MessageContext {
+	var ctx MessageContext
+	var wg sync.WaitGroup
+	wg.Add(5)
 
+	// 1. Recent Context
+	go func() {
+		defer wg.Done()
+		ctx.RecentMessages = h.getRecentMessages(userID)
+	}()
+
+	// 2. Search Memory (RAG)
+	go func() {
+		defer wg.Done()
+		// Generate Embedding for current message
+		emb, err := h.embeddingClient.Embed(content)
+		if err != nil {
+			log.Printf("Error generating embedding: %v", err)
+			return
+		}
+		if emb != nil {
+			var err error
+			ctx.Matches, err = h.memoryStore.Search(userID, emb, 5) // Top 5 relevant memories
+			if err != nil {
+				log.Printf("Error searching memory: %v", err)
+			}
+		}
+	}()
+
+	// 3. Emojis
+	go func() {
+		defer wg.Done()
+		if channel != nil && channel.GuildID != "" {
+			emojiList := h.getRelevantEmojis(channel.GuildID, s)
+			if len(emojiList) > 0 {
+				ctx.EmojiText = "Available custom emojis:\n" + strings.Join(emojiList, ", ")
+			}
+		}
+	}()
+
+	// 4. Fetch User Profile
+	go func() {
+		defer wg.Done()
+		var err error
+		ctx.Facts, err = h.memoryStore.GetFacts(userID)
+		if err != nil {
+			log.Printf("Error fetching user profile: %v", err)
+		}
+	}()
+
+	// 5. Process Image Attachments (if any)
+	go func() {
+		defer wg.Done()
+		ctx.ImageContext = h.processImageAttachments(attachments)
+	}()
+
+	wg.Wait()
+	return ctx
+}
 
 func (h *Handler) cleanupLoop() {
 	// Run cleanup every hour
