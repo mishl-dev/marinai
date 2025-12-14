@@ -183,29 +183,52 @@ func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.Inter
 	affection, level := h.GetUserAffection(userID)
 	streak, _ := h.memoryStore.GetStreak(userID)
 
-	responseContent := fmt.Sprintf("**💕 Relationship with %s**\n\n%s", userName, FormatAffectionDisplay(affection, streak))
-
-	// Add flavor text based on level
+	// Build flavor text
+	var flavorText string
 	switch level.Name {
 	case "Stranger":
-		responseContent += "\n\nwe just met~ let's chat more!"
+		flavorText = "we just met~ let's chat more!"
+	case "Familiar Face":
+		flavorText = "i think i've seen you around? hey there!"
 	case "Acquaintance":
-		responseContent += "\n\ni'm starting to remember you~"
+		flavorText = "i'm starting to remember you~"
+	case "Casual Friend":
+		flavorText = "always nice to chat with you~"
 	case "Friend":
-		responseContent += "\n\nwe're friends now! nice"
+		flavorText = "we're friends now! nice"
+	case "Good Friend":
+		flavorText = "you're pretty cool, you know that?"
 	case "Close Friend":
-		responseContent += "\n\nyou're like... really important to me"
+		flavorText = "you're like... really important to me"
 	case "Best Friend":
-		responseContent += "\n\ni literally think about you all the time"
+		flavorText = "i literally think about you all the time"
+	case "Soulmate":
+		flavorText = "you complete me. seriously. 💕"
 	case "Special Someone":
-		responseContent += "\n\n...you know how i feel about you right? 💕"
+		flavorText = "...you know how i feel about you right? 💕"
+	default:
+		flavorText = "hello! nice to see you~"
+	}
+
+	// Create Embed
+	embed := &discordgo.MessageEmbed{
+		Title:       fmt.Sprintf("💕 Relationship with %s", userName),
+		Description: flavorText,
+		Color:       0xFF69B4, // Hot Pink
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:   "Current Status",
+				Value:  FormatAffectionDisplay(affection, streak),
+				Inline: false,
+			},
+		},
 	}
 
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: responseContent,
-			Flags:   discordgo.MessageFlagsEphemeral,
+			Embeds: []*discordgo.MessageEmbed{embed},
+			Flags:  discordgo.MessageFlagsEphemeral,
 		},
 	})
 
