@@ -245,27 +245,6 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 		h.memoryStore.SetFirstInteraction(m.Author.ID, time.Now())
 	}()
 
-	// Calculate affection changes in background (don't block reply)
-	// Store milestone/event messages to potentially include in reply
-	go func() {
-		_, milestoneMsg, randomEventMsg := h.UpdateAffectionForMessage(m.Author.ID, m.Content, isMentioned, isDM, false, currentMoodForAffection)
-		
-		// If there's a milestone or random event, send it as a follow-up DM
-		if milestoneMsg != "" || randomEventMsg != "" {
-			// Create a DM channel
-			dmChannel, err := s.UserChannelCreate(m.Author.ID)
-			if err == nil && dmChannel != nil {
-				if milestoneMsg != "" {
-					s.ChannelMessageSend(dmChannel.ID, milestoneMsg)
-				}
-				if randomEventMsg != "" && milestoneMsg == "" {
-					// Only send random event if no milestone (to avoid spam)
-					s.ChannelMessageSend(dmChannel.ID, randomEventMsg)
-				}
-			}
-		}
-	}()
-
 	// Prepare display name
 	displayName := m.Author.Username
 	if m.Author.GlobalName != "" {
@@ -279,12 +258,15 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	if isTask {
 		h.sendSplitMessage(s, m.ChannelID, refusal, m.Reference())
 
-		// Record the refusal in recent memory
+		// Record the refusal in recent memory and calculate affection AFTER response
 		h.wg.Add(1)
 		go func() {
 			defer h.wg.Done()
 			h.addRecentMessage(m.Author.ID, "user", m.Content)
 			h.addRecentMessage(m.Author.ID, "assistant", refusal)
+			
+			// Calculate affection based on full interaction (user message + Marin's response)
+			h.UpdateAffectionForInteraction(m.Author.ID, m.Content, refusal, isMentioned, isDM, false, currentMoodForAffection)
 		}()
 		return
 	}
@@ -387,6 +369,24 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 
 		// Background Memory Extraction
 		h.extractMemories(m.Author.ID, displayName, m.Content, reply)
+		
+		// Calculate affection based on full interaction (user message + Marin's response)
+		// This happens AFTER the response so we can analyze the actual interaction dynamics
+		_, milestoneMsg, randomEventMsg := h.UpdateAffectionForInteraction(m.Author.ID, m.Content, reply, isMentioned, isDM, false, currentMoodForAffection)
+		
+		// If there's a milestone or random event, send it as a follow-up DM
+		if milestoneMsg != "" || randomEventMsg != "" {
+			dmChannel, err := s.UserChannelCreate(m.Author.ID)
+			if err == nil && dmChannel != nil {
+				if milestoneMsg != "" {
+					s.ChannelMessageSend(dmChannel.ID, milestoneMsg)
+				}
+				if randomEventMsg != "" && milestoneMsg == "" {
+					// Only send random event if no milestone (to avoid spam)
+					s.ChannelMessageSend(dmChannel.ID, randomEventMsg)
+				}
+			}
+		}
 	}()
 }
 

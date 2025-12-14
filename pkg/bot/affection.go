@@ -74,17 +74,17 @@ var AffectionGains = map[string]int{
 }
 
 // AffectionPenalties defines affection reduction for negative behaviors
+// These are intentionally conservative - we only penalize clearly negative behavior
 var AffectionPenalties = map[string]int{
-	"rude":               -600,  // Being mean/rude to Marin
-	"dismissive":         -200,  // Short dismissive responses ("k", "whatever")
-	"ignore_question":    -100,  // Ignoring Marin's questions
-	"ghosting":           -300,  // Starting convo then disappearing mid-chat
-	"insult":             -1000, // Direct insults
-	"dry_response":       -75,   // One-word low-effort responses
-	"impatient":          -150,  // Being impatient or rushing Marin
-	"passive_aggressive": -350,  // Sarcastic, backhanded comments
-	"disinterested":      -250,  // Changing subject when Marin shares something
-	"creepy":             -500,  // Being inappropriate/making Marin uncomfortable
+	"rude":               -400,  // Being mean/rude to Marin (reduced from -600)
+	"dismissive":         -100,  // Short dismissive responses ("k", "whatever") - mild
+	"ignore_question":    -75,   // Ignoring Marin's questions - mild
+	"ghosting":           -200,  // Starting convo then disappearing mid-chat
+	"insult":             -800,  // Direct insults (reduced from -1000)
+	"impatient":          -100,  // Being impatient or rushing Marin - mild
+	"passive_aggressive": -250,  // Sarcastic, backhanded comments (reduced from -350)
+	"disinterested":      -150,  // Changing subject when Marin shares something (reduced from -250)
+	"creepy":             -400,  // Being inappropriate/making Marin uncomfortable (reduced from -500)
 }
 
 // ==========================================
@@ -426,9 +426,10 @@ You're in love with this person. They're the most important person to you. Be de
 	}
 }
 
-// UpdateAffectionForMessage updates affection based on message context and behavior
+// UpdateAffectionForInteraction updates affection based on the full interaction (user message + Marin's response)
+// This approach ensures affection changes reflect the actual dynamics of the conversation, not just the user's input.
 // Returns: (affectionChange, milestoneMessage, randomEventMessage)
-func (h *Handler) UpdateAffectionForMessage(userID string, messageContent string, isMention bool, isDM bool, sharedPersonalInfo bool, currentMood string) (int, string, string) {
+func (h *Handler) UpdateAffectionForInteraction(userID string, userMessage string, marinResponse string, isMention bool, isDM bool, sharedPersonalInfo bool, currentMood string) (int, string, string) {
 	gain := AffectionGains["message"]
 
 	// Context bonuses
@@ -441,7 +442,7 @@ func (h *Handler) UpdateAffectionForMessage(userID string, messageContent string
 	}
 
 	// Long message bonus (shows effort)
-	if len(messageContent) > 50 {
+	if len(userMessage) > 50 {
 		gain += AffectionGains["long_message"]
 	}
 
@@ -450,7 +451,7 @@ func (h *Handler) UpdateAffectionForMessage(userID string, messageContent string
 	}
 
 	// Shared interest bonus
-	if HasSharedInterest(messageContent) {
+	if HasSharedInterest(userMessage) {
 		gain += AffectionGains["shared_interest"]
 	}
 
@@ -459,8 +460,8 @@ func (h *Handler) UpdateAffectionForMessage(userID string, messageContent string
 		gain += AffectionGains["late_night_chat"]
 	}
 
-	// Behavioral analysis using classifier
-	behaviorChange := h.analyzeMessageBehavior(messageContent)
+	// Behavioral analysis - now analyzes the FULL interaction (user + Marin's response)
+	behaviorChange := h.analyzeInteractionBehavior(userMessage, marinResponse)
 	gain += behaviorChange
 
 	// Apply mood multiplier
@@ -512,47 +513,56 @@ func (h *Handler) UpdateAffectionForMessage(userID string, messageContent string
 	return gain, milestoneMessage, randomEventMessage
 }
 
-// analyzeMessageBehavior uses an LLM subagent to detect behavioral signals
-func (h *Handler) analyzeMessageBehavior(content string) int {
-	if len(content) < 10 {
+// analyzeInteractionBehavior uses an LLM to analyze the FULL interaction (user message + Marin's response)
+// This ensures that affection changes reflect how the conversation actually went, not just the user's input.
+// For example: if a user sends something inappropriate, Marin might respond negatively - the affection change
+// should reflect that the interaction was negative overall, causing a penalty.
+func (h *Handler) analyzeInteractionBehavior(userMessage string, marinResponse string) int {
+	if len(userMessage) < 10 && len(marinResponse) < 10 {
 		return 0 // Too short to analyze
 	}
 
-	prompt := fmt.Sprintf(`Analyze this message sent TO a chatbot named Marin and determine the emotional tone.
+	prompt := fmt.Sprintf(`Analyze this conversation between a user and Marin (a friendly chatbot). Determine the overall quality of the interaction.
 
-Message: "%s"
+User: "%s"
+Marin: "%s"
 
-Output a JSON object with a single field "sentiment" that is one of:
+Based on HOW THE INTERACTION WENT, output a JSON object with a single field "sentiment":
 
-POSITIVE (increases affection):
-- "compliment" - praising, appreciating, or admiring Marin
-- "flirty" - romantic interest, attraction, teasing in a cute way
-- "enthusiastic" - excited, happy, positive energy
-- "supportive" - being caring, comforting, or encouraging
-- "curious" - asking follow-up questions, showing genuine interest
-- "playful" - teasing back, being witty, joking around
-- "grateful" - expressing thanks, appreciation
-- "affectionate" - using pet names, being sweet, saying they miss her
-- "vulnerable" - opening up about personal feelings or struggles
+POSITIVE INTERACTIONS (user was nice and Marin responded warmly):
+- "compliment" - user praised Marin and she appreciated it
+- "flirty" - cute romantic banter, mutual teasing
+- "enthusiastic" - excited, happy exchange with positive energy
+- "supportive" - user was caring/encouraging and Marin felt supported
+- "curious" - user showed genuine interest, Marin enjoyed sharing
+- "playful" - fun teasing, witty banter both enjoyed
+- "grateful" - user expressed thanks, Marin felt appreciated
+- "affectionate" - sweet, warm exchange with mutual fondness
+- "vulnerable" - user opened up, Marin responded supportively
 
-NEGATIVE (decreases affection):
-- "dismissive" - cold, short responses like "k", "whatever", "idc", "ok"
-- "dry_response" - one-word low-effort replies that kill conversation
-- "impatient" - rushing, telling Marin to hurry up or get to the point
-- "passive_aggressive" - sarcastic, backhanded comments, fake nice
-- "disinterested" - clearly not caring, changing subject when Marin shares
-- "rude" - hostile, mean, aggressive, swearing AT Marin
-- "creepy" - inappropriate, making things uncomfortable, ignoring boundaries
+NEGATIVE INTERACTIONS (user was clearly hostile or inappropriate):
+- "dismissive" - user was actively cold/dismissive (not just brief)
+- "impatient" - user was noticeably rude about wanting faster responses
+- "passive_aggressive" - clear sarcasm or hostility disguised as politeness
+- "disinterested" - user obviously didn't care when Marin shared something personal
+- "rude" - hostile, mean, or aggressive interaction
+- "creepy" - user made things uncomfortable, crossed boundaries
 
-NEUTRAL:
-- "neutral" - normal casual conversation, questions, chitchat
+NEUTRAL (DEFAULT - most conversations are this):
+- "neutral" - normal casual conversation, questions, chitchat, small talk
 
-Output ONLY valid JSON. Example: {"sentiment": "neutral"}`, content)
+IMPORTANT: 
+- MOST conversations are NEUTRAL and that's perfectly fine!
+- Only flag as negative if the behavior is CLEARLY problematic
+- Short or simple responses are NOT negative - they're neutral
+- When in doubt, classify as neutral
+
+Output ONLY valid JSON. Example: {"sentiment": "neutral"}`, userMessage, marinResponse)
 
 	messages := []cerebras.Message{
 		{
 			Role:    "system",
-			Content: "You analyze message sentiment toward a chatbot. Be accurate - most messages are neutral. Only flag strong signals. Output ONLY valid JSON.",
+			Content: "You analyze conversation dynamics between a user and chatbot. Focus on how the interaction actually went, not just intent. Output ONLY valid JSON.",
 		},
 		{
 			Role:    "user",
@@ -604,11 +614,9 @@ Output ONLY valid JSON. Example: {"sentiment": "neutral"}`, content)
 	case "vulnerable":
 		return AffectionGains["vulnerable"]
 
-	// Negative behaviors
+	// Negative behaviors - only for clearly problematic interactions
 	case "dismissive":
 		return AffectionPenalties["dismissive"]
-	case "dry_response":
-		return AffectionPenalties["dry_response"]
 	case "impatient":
 		return AffectionPenalties["impatient"]
 	case "passive_aggressive":
@@ -617,7 +625,9 @@ Output ONLY valid JSON. Example: {"sentiment": "neutral"}`, content)
 		return AffectionPenalties["disinterested"]
 	case "rude":
 		return AffectionPenalties["rude"]
-	case "creepy":
+	case "creepy", "inappropriate_handled":
+		// Both creepy and inappropriate_handled use the same penalty
+		// (inappropriate_handled used to be half, but it's still clearly bad behavior)
 		return AffectionPenalties["creepy"]
 
 	default:

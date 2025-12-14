@@ -346,6 +346,7 @@ func TestMessageFlow(t *testing.T) {
 	mockCerebras.ChatCompletionFunc = func(messages []cerebras.Message) (string, error) {
 		var promptBuilder strings.Builder
 		isMemoryEvaluation := false
+		isSentimentAnalysis := false
 		userMessage := ""
 		for _, msg := range messages {
 			var role string
@@ -363,8 +364,14 @@ func TestMessageFlow(t *testing.T) {
 			if strings.Contains(msg.Content, "Task: Analyze the interaction and output a JSON object with") {
 				isMemoryEvaluation = true
 			}
+			// Detect sentiment analysis calls from analyzeInteractionBehavior
+			if strings.Contains(msg.Content, "Based on HOW THE INTERACTION WENT") ||
+				strings.Contains(msg.Content, "Analyze this conversation between a user and Marin") {
+				isSentimentAnalysis = true
+			}
 		}
-		if !isMemoryEvaluation {
+		// Only capture finalPrompt for the main conversation, not for memory or sentiment analysis
+		if !isMemoryEvaluation && !isSentimentAnalysis {
 			finalPrompt = promptBuilder.String()
 		}
 
@@ -377,6 +384,11 @@ func TestMessageFlow(t *testing.T) {
 				return `{"add": ["User loves to code"], "remove": []}`, nil
 			}
 			return `{"add": [], "remove": []}`, nil
+		}
+
+		// Return neutral sentiment for sentiment analysis
+		if isSentimentAnalysis {
+			return `{"sentiment": "neutral"}`, nil
 		}
 
 		return "This is a standard response.", nil
