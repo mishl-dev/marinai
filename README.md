@@ -9,14 +9,6 @@
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#installation">Installation</a> •
-  <a href="#configuration">Configuration</a> •
-  <a href="#commands">Commands</a> •
-  <a href="#architecture">Architecture</a>
-</p>
-
-<p align="center">
   <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat-square&logo=go" alt="Go Version"/>
   <img src="https://img.shields.io/badge/Discord-Bot-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord Bot"/>
   <img src="https://img.shields.io/badge/SurrealDB-Powered-FF00A0?style=flat-square" alt="SurrealDB"/>
