@@ -1,135 +1,149 @@
-# 🌸 Marin AI - Discord Bot
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mishl-dev/marinai/main/.github/assets/banner.png" alt="Marin AI Banner" width="100%"/>
+</p>
 
-A sophisticated Discord bot that embodies Marin Kitagawa from *My Dress-Up Darling* - complete with dynamic personality, memory systems, and relationship mechanics.
+<h1 align="center">✨ Marin AI ✨</h1>
+
+<p align="center">
+  <strong>An AI-powered Discord companion inspired by Marin Kitagawa</strong>
+</p>
+
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#configuration">Configuration</a> •
+  <a href="#commands">Commands</a> •
+  <a href="#architecture">Architecture</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat-square&logo=go" alt="Go Version"/>
+  <img src="https://img.shields.io/badge/Discord-Bot-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord Bot"/>
+  <img src="https://img.shields.io/badge/SurrealDB-Powered-FF00A0?style=flat-square" alt="SurrealDB"/>
+  <img src="https://img.shields.io/badge/Cerebras-AI-orange?style=flat-square" alt="Cerebras AI"/>
+</p>
+
+---
+
+## 🌸 About
+
+**Marin AI** is a Discord bot that embodies the personality of Marin Kitagawa — the bubbly, passionate cosplayer from *My Dress-Up Darling*. She's not just another chatbot; she **remembers** you, develops **relationships** over time, and has her own **moods** that affect how she interacts with you.
+
+Built with love using Go, Cerebras AI for ultra-fast inference, and SurrealDB for persistent memory.
+
+---
 
 ## ✨ Features
 
-### 🧠 Advanced Memory System
-- **Vector-based RAG**: Semantic search through conversation history using embeddings
-- **Fact extraction**: Automatically learns and remembers personal information about users
-- **Memory aging**: Facts older than 7 days are archived to vector storage
-- **Automatic summarization**: Consolidates profile facts when threshold is reached
-- **Rolling context**: Maintains last 15 messages for coherent conversations
+### 🧠 Persistent Memory
+- **Vector-based memory** — Marin remembers conversations using semantic embeddings
+- **Fact extraction** — She learns and stores facts about users (interests, preferences, etc.)
+- **Memory maintenance** — Automatic aging and summarization of old memories
+- **Duplicate detection** — Smart deduplication prevents redundant memories
 
-### 💕 Relationship System
-- **Affection tracking**: 6-tier progression from Stranger (0) to Special Someone (10,000 XP)
-- **Behavioral analysis**: LLM-powered sentiment detection adjusts affection based on interactions
-- **Natural decay**: Affection decays over time based on relationship level (prevents grinding)
-- **Contextual bonuses**: DMs, mentions, compliments, vulnerability all increase affection
-- **Dynamic personality**: Marin's responses adapt to your relationship level
+### 💕 Affection System
+A sophisticated relationship system inspired by dating sims:
 
-### 🎭 Dynamic Mood System
-- **7 distinct moods**: HAPPY, HYPER, SLEEPY, BORED, FLIRTY, FOCUSED, NOSTALGIC
-- **Time-aware**: Changes based on Tokyo timezone and time of day
-- **Activity-based**: Responds to message rate and server activity
-- **Status integration**: Mood affects Discord status, typing speed, and reaction likelihood
+| Level | XP Range | Description |
+|-------|----------|-------------|
+| 👋 Stranger | 0 - 999 | Just met |
+| 🙂 Acquaintance | 1,000 - 2,499 | Starting to recognize you |
+| 😊 Friend | 2,500 - 4,999 | Comfortable and casual |
+| 💕 Close Friend | 5,000 - 7,499 | Sharing personal things |
+| 💗 Best Friend | 7,500 - 8,999 | No barriers |
+| ❤️ Special Someone | 9,000 - 10,000 | Maximum affection |
 
-### 🤖 Intelligence Features
-- **Multi-model fallback**: Cycles through Cerebras models (Llama 3.3 70B → ZaI GLM → others)
-- **Task detection**: Refuses long writing tasks with in-character responses
-- **Image understanding**: Gemini Flash Lite for vision capabilities
-- **Smart reactions**: Classifies messages and reacts with appropriate emojis
-- **Loneliness system**: Duolingo-style DMs when inactive (won't spam if ignored)
+**How it works:**
+- Affection increases through positive interactions (compliments, long conversations, being supportive)
+- Affection decreases from negative behaviors (being rude, dismissive, or ignoring her)
+- Natural decay over time if you don't interact (but closer relationships decay slower!)
+- Marin's personality adapts based on your relationship level
 
-### ⏰ Reminder System
-- **Natural language**: Extracts reminders from conversation context
-- **Smart delivery**: Sends contextual, in-character reminder messages
-- **Automatic cleanup**: Removes old reminders after 24 hours
+### 🎭 Dynamic Moods
+Marin has different moods that cycle naturally and affect her responses:
 
-### 🎨 Discord Features
-- **Slash commands**: `/stats`, `/reset`, `/mood`, `/affection`
-- **Custom emoji support**: Filters and uses server emojis relevant to Marin's interests
-- **Typing simulation**: Realistic typing delays based on message length and mood
-- **Split messages**: Long replies broken into natural chunks
+- ✨ **Hyper** — Extra energetic and excitable
+- 😴 **Sleepy** — A bit drowsy, shorter responses
+- 😏 **Flirty** — More teasing and playful
+- 🌸 **Nostalgic** — Reflective and wistful
+- 🎯 **Focused** — Task-oriented, less distracted
+- 😤 **Bored** — Looking for entertainment
 
-## 🏗️ Architecture
+### 📸 Image Understanding
+- Powered by **Google Gemini** for vision capabilities
+- Marin can see and comment on images you send
+- Natural reactions to photos and memes
 
-```
-┌─────────────────┐
-│  Discord Bot    │
-│  (DiscordGo)    │
-└────────┬────────┘
-         │
-    ┌────▼─────────────────────────────────┐
-    │         Handler Layer                │
-    │  • Message routing                   │
-    │  • Mood management                   │
-    │  • Affection calculations            │
-    └────┬─────────────────────────────────┘
-         │
-    ┌────▼──────────────┬──────────────────┬──────────────┐
-    │                   │                  │              │
-┌───▼──────┐    ┌──────▼──────┐    ┌─────▼─────┐  ┌────▼─────┐
-│ Cerebras │    │   Gemini    │    │ Embedding │  │ SurrealDB│
-│   LLM    │    │Flash Lite   │    │   API     │  │  Memory  │
-└──────────┘    └─────────────┘    └───────────┘  └──────────┘
-```
+### 😺 Emoji Reactions
+- Uses custom guild emojis when available
+- Smart reaction matching based on message content
+- Personality-appropriate emoji selection
 
-### Core Components
+### 💌 Boredom DMs (Duolingo-style)
+- If you haven't talked to Marin in 2+ days, she might DM you
+- "hey... haven't heard from you in a while..."
+- Won't spam — only one pending DM at a time
+- Responding to her DM gives bonus affection!
 
-**`pkg/bot/handler.go`** - Central message processing and orchestration
-**`pkg/memory/surreal_store.go`** - SurrealDB interface for persistent storage
-**`pkg/cerebras/client.go`** - Multi-model LLM client with automatic fallback
-**`pkg/gemini/client.go`** - Vision and fast text classification
-**`pkg/embedding/client.go`** - Vector embedding generation with LRU cache
+### ⏰ Reminders
+- Set reminders that Marin will deliver
+- Automatic cleanup of old reminders
 
-## 🚀 Quick Start
+---
+
+## 🚀 Installation
 
 ### Prerequisites
-- Go 1.24+
+- Go 1.24 or higher
 - SurrealDB instance
-- API keys for:
-  - Discord Bot Token
-  - Cerebras API
+- Discord Bot Token
+- API Keys for:
+  - Cerebras (primary LLM)
   - Embedding API
-  - Gemini API (optional, for vision)
+  - Google Gemini (optional, for vision)
 
-### Installation
+### Quick Start
 
 1. **Clone the repository**
-```bash
-git clone https://github.com/yourusername/marinai.git
-cd marinai
-```
+   ```bash
+   git clone https://github.com/mishl-dev/marinai.git
+   cd marinai
+   ```
 
-2. **Configure environment**
-```bash
-cp example.env .env
-# Edit .env with your API keys
-```
+2. **Copy example environment file**
+   ```bash
+   cp example.env .env
+   ```
 
-3. **Run with Docker Compose**
+3. **Configure your `.env`**
+   ```env
+   DISCORD_TOKEN=your_discord_bot_token
+   CEREBRAS_API_KEY=your_cerebras_key
+   EMBEDDING_API_URL=your_embedding_endpoint
+   EMBEDDING_API_KEY=your_embedding_key
+   SURREAL_DB_HOST=your_surreal_host
+   SURREAL_DB_USER=root
+   SURREAL_DB_PASS=your_password
+   GEMINI_API_KEY=your_gemini_key  # Optional
+   ```
+
+4. **Run the bot**
+   ```bash
+   go run main.go
+   ```
+
+### Docker Deployment
+
 ```bash
+# Build and run with Docker Compose
 docker-compose up -d
 ```
 
-**Or build manually:**
-```bash
-go mod download
-go build -o marinai ./main.go
-./marinai
-```
+The included `docker-compose.yml` handles environment variables and volume mounting for the config file.
+
+---
 
 ## ⚙️ Configuration
-
-### Environment Variables
-
-```env
-# Required
-DISCORD_TOKEN=your_discord_bot_token
-CEREBRAS_API_KEY=your_cerebras_key
-EMBEDDING_API_KEY=your_embedding_key
-SURREAL_DB_HOST=wss://your-db.example.com/rpc
-SURREAL_DB_USER=your_user
-SURREAL_DB_PASS=your_password
-
-# Optional
-GEMINI_API_KEY=your_gemini_key
-EMBEDDING_API_URL=https://vector.mishl.dev/embed
-SURREAL_DB_NAMESPACE=marin
-SURREAL_DB_DATABASE=memory
-DISCORD_GUILD_ID=your_guild_for_testing
-```
 
 ### config.yml
 
@@ -139,111 +153,116 @@ model_settings:
   top_p: 1           # Nucleus sampling
 
 delays:
-  message_processing: 1.5  # Seconds between multi-part messages
+  message_processing: 1.5   # Seconds before responding (typing simulation)
 
 memory:
-  fact_aging_days: 7                    # Days before facts archive
-  fact_summarization_threshold: 20      # Facts before summarization
-  maintenance_interval_hours: 24        # Memory maintenance frequency
+  fact_aging_days: 7               # Days before facts start aging
+  fact_summarization_threshold: 20 # Max facts before summarization
+  maintenance_interval_hours: 24   # How often to run memory maintenance
 ```
 
-## 📊 Database Schema
+### Environment Variables
 
-SurrealDB tables used by the bot:
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DISCORD_TOKEN` | ✅ | Your Discord bot token |
+| `CEREBRAS_API_KEY` | ✅ | Cerebras API key for LLM |
+| `EMBEDDING_API_URL` | ✅ | Endpoint for text embeddings |
+| `EMBEDDING_API_KEY` | ✅ | API key for embeddings |
+| `SURREAL_DB_HOST` | ✅ | SurrealDB WebSocket URL |
+| `SURREAL_DB_USER` | ✅ | SurrealDB username |
+| `SURREAL_DB_PASS` | ✅ | SurrealDB password |
+| `SURREAL_DB_NAMESPACE` | ❌ | Namespace (default: `marin`) |
+| `SURREAL_DB_DATABASE` | ❌ | Database (default: `memory`) |
+| `GEMINI_API_KEY` | ❌ | Google Gemini key for vision |
+| `DISCORD_GUILD_ID` | ❌ | Guild ID for faster command updates during dev |
 
-- **`memories`** - Vector embeddings for semantic search (2048-dim, cosine similarity)
-- **`user_profiles`** - User facts, affection, last interaction timestamps
-- **`recent_messages`** - Rolling 15-message context window
-- **`reminders`** - Scheduled user reminders
-- **`guild_cache`** - Cached custom emoji lists
-- **`bot_state`** - Global state (current mood, etc.)
-- **`pending_dm`** - Tracks unanswered loneliness DMs
+---
 
-## 🎮 Usage Examples
+## 💬 Commands
 
-### Basic Interaction
+### Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `/reset` | Permanently delete all your conversation history and memories |
+| `/stats` | See what Marin remembers about you |
+| `/mood` | Check Marin's current mood |
+| `/affection` | Check your relationship status with Marin |
+
+### Interacting with Marin
+
+Marin responds when:
+- **Mentioned** (`@Marin hey!`)
+- **Replied to** (reply to any of her messages)
+- **Random chance** (~30% in active channels)
+- **DMs** (always responds in direct messages)
+
+---
+
+## 🏗️ Architecture
+
 ```
-User: @Marin what do you think about cosplay?
-Marin: cosplay is literally my life??? like i cant imagine doing anything else
-       working on a shizuku-tan costume rn and its SO GOOD
+marinai/
+├── main.go                 # Entry point, initialization
+├── config.yml              # Bot configuration
+├── Dockerfile              # Multi-stage build
+├── docker-compose.yml      # Container orchestration
+└── pkg/
+    ├── bot/                # Core bot logic
+    │   ├── handler.go      # Message handling
+    │   ├── affection.go    # Relationship system
+    │   ├── mood.go         # Mood system
+    │   ├── memory_*.go     # Memory processing
+    │   ├── slash_commands.go
+    │   └── system_prompt.go
+    ├── cerebras/           # Cerebras LLM client
+    ├── gemini/             # Google Gemini adapter
+    ├── embedding/          # Text embedding client
+    ├── memory/             # Memory store interface
+    └── surreal/            # SurrealDB client
 ```
 
-### Affection System
-```
-/affection
-💕 Close Friend
-████████░░
-5,234 / 7,500 XP to next level
-```
+### Tech Stack
 
-### Memory Extraction
-```
-User: I just started learning Japanese!
-Marin: oh thats sick!! you gonna watch anime without subs?
+- **Language**: Go 1.24
+- **Discord Library**: [discordgo](https://github.com/bwmarrin/discordgo)
+- **Database**: [SurrealDB](https://surrealdb.com/) — Vector search + document storage
+- **LLM**: [Cerebras](https://cerebras.ai/) — Ultra-fast inference
+- **Vision**: [Google Gemini](https://ai.google.dev/) — Image understanding
+- **Caching**: In-memory LRU cache for embeddings
 
-# Bot automatically saves: "User is learning Japanese"
-```
+---
 
-### Mood System
-```
-/mood
-😴 SLEEPY
-so tired... need sleep
+## 🔧 Development
 
-*yawns*
-```
-
-## 🧪 Testing
+### Running Tests
 
 ```bash
-# Run all tests
-go test -v ./...
-
-# Test specific package
-go test -v ./pkg/bot
-
-# Test with coverage
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
+go test ./...
 ```
 
-## 🚢 Deployment
+### Project Structure
 
-### Docker (Recommended)
-```bash
-docker-compose up -d
-```
+| Package | Purpose |
+|---------|---------|
+| `pkg/bot` | Discord event handlers, personality logic |
+| `pkg/cerebras` | LLM API client |
+| `pkg/gemini` | Vision API adapter |
+| `pkg/embedding` | Text embedding with caching |
+| `pkg/memory` | Memory store abstraction |
+| `pkg/surreal` | SurrealDB client wrapper |
 
-### GitHub Actions
-Auto-releases on push to `master`:
-- Runs tests
-- Builds binary
-- Creates Docker image
-- Publishes to GitHub Container Registry
-
-```bash
-docker pull ghcr.io/yourusername/marinai:latest
-```
-
-## 🤝 Contributing
-
-Contributions welcome! Areas for improvement:
-
-- [ ] Multi-language support
-- [ ] Voice channel integration
-- [ ] Image generation for "selfies"
-- [ ] Costume/outfit system (see `ideas.md`)
-- [ ] Enhanced proactive behaviors
+---
 
 ## 📜 License
 
-**THE CURSE OF KNOWLEDGE LICENSE v1.0** - See `LICENSE` for the paradoxical details.
+This project uses **The Curse of Knowledge License** — a satirical license where reading it revokes all rights. In practice: do whatever you want, just don't be weird about it.
 
-> *Warning: Reading the license revokes your rights to use this software. Proceed with caution.*
+---
 
 ## 🙏 Acknowledgments
 
-- **Character Design**: Marin Kitagawa from *Sono Bisque Doll wa Koi wo Suru* (©Shinichi Fukuda)
-- **LLM**: Powered by [Cerebras](https://cerebras.ai/) and [Google Gemini](https://ai.google.dev/)
-- **Discord Library**: [DiscordGo](https://github.com/bwmarrin/discordgo)
-- **Database**: [SurrealDB](https://surrealdb.com/)
+- **Marin Kitagawa** — The character from *My Dress-Up Darling* by Shinichi Fukuda
+- **Cerebras** — For providing ultra-fast LLM inference
+- **SurrealDB** — For the excellent database with built-in vector search
