@@ -91,7 +91,7 @@ func (h *Handler) performLonelinessCheck() bool {
 			if timeSinceDM < backoffDuration {
 				// Not enough time has passed, skip this user
 				log.Printf("User %s: backoff active (DM #%d, wait %.1f more hours)",
-					userID, dmCount, (backoffDuration-timeSinceDM).Hours())
+					userID, dmCount, (backoffDuration - timeSinceDM).Hours())
 				continue
 			}
 			// Backoff period expired, user is eligible for another DM
