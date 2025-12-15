@@ -124,11 +124,15 @@ Output ONLY valid JSON with "add", "remove", and "reminders" arrays.`,
 
 	// Robust markdown stripping
 	if strings.HasPrefix(jsonStr, "```") {
-		lines := strings.Split(jsonStr, "\n")
-		if len(lines) >= 2 {
-			// If it starts with ```json or ```, strip the first and last lines
-			// We reconstruct the middle lines
-			jsonStr = strings.Join(lines[1:len(lines)-1], "\n")
+		// Find first newline
+		if idx := strings.Index(jsonStr, "\n"); idx != -1 {
+			// Find last newline
+			if lastIdx := strings.LastIndex(jsonStr, "\n"); lastIdx > idx {
+				// Slice the string between the first and last newline
+				// We exclude the first newline char (idx+1)
+				// We rely on strings.TrimSpace later to handle any surrounding whitespace
+				jsonStr = jsonStr[idx+1 : lastIdx]
+			}
 		}
 	}
 	jsonStr = strings.TrimSpace(jsonStr)
