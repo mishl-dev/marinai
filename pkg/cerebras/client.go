@@ -106,10 +106,13 @@ func (c *Client) ChatCompletion(messages []Message) (string, error) {
 			Messages:    messages,
 		}
 
+		start := time.Now()
 		content, err := c.makeRequest(reqBody)
+		duration := time.Since(start)
 
 		if err == nil {
 			// Success: Received a 200 OK and valid content
+			log.Printf("Model %s success (took %v, %d chars)", modelConf.ID, duration, len(content))
 			return content, nil
 		}
 
