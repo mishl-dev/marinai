@@ -90,9 +90,10 @@ func (s *SurrealStore) Init() error {
 		"DEFINE FIELD IF NOT EXISTS value ON bot_state TYPE string",
 		"DEFINE FIELD IF NOT EXISTS updated_at ON bot_state TYPE int",
 
-		// -- Pending DM --
+		// -- Pending DM (with exponential backoff) --
 		"DEFINE FIELD IF NOT EXISTS user_id ON pending_dm TYPE string",
 		"DEFINE FIELD IF NOT EXISTS sent_at ON pending_dm TYPE int",
+		"DEFINE FIELD IF NOT EXISTS dm_count ON pending_dm TYPE int DEFAULT 1",
 
 		// -- Migrations --
 		"UPDATE user_profiles SET last_interaction = 0 WHERE last_interaction IS NONE",
@@ -696,7 +697,8 @@ func (s *SurrealStore) DeleteFacts(userID string) error {
 	return err
 }
 
-// Pending DM tracking (Duolingo-style)
+// Pending DM tracking (with exponential backoff)
+// Schedule: 1 day -> 2 days -> 4 days -> 7 days (capped)
 
 // HasPendingDM checks if the user has an unanswered boredom DM
 func (s *SurrealStore) HasPendingDM(userID string) (bool, error) {
@@ -714,21 +716,73 @@ func (s *SurrealStore) HasPendingDM(userID string) (bool, error) {
 	return true, nil
 }
 
-// SetPendingDM marks that a boredom DM was sent and is awaiting response
+// GetPendingDMInfo returns the sent_at time and dm_count for exponential backoff
+func (s *SurrealStore) GetPendingDMInfo(userID string) (sentAt time.Time, dmCount int, exists bool, err error) {
+	query := `SELECT sent_at, dm_count FROM pending_dm WHERE id = type::thing("pending_dm", $user_id);`
+	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
+	if err != nil {
+		return time.Time{}, 0, false, err
+	}
+
+	rows, ok := result.([]interface{})
+	if !ok || len(rows) == 0 {
+		return time.Time{}, 0, false, nil
+	}
+
+	if row, ok := rows[0].(map[string]interface{}); ok {
+		// Parse sent_at
+		var timestamp int64
+		switch t := row["sent_at"].(type) {
+		case float64:
+			timestamp = int64(t)
+		case int64:
+			timestamp = t
+		case int:
+			timestamp = int64(t)
+		}
+
+		// Parse dm_count
+		var count int
+		switch c := row["dm_count"].(type) {
+		case float64:
+			count = int(c)
+		case int64:
+			count = int(c)
+		case int:
+			count = c
+		case nil:
+			count = 1 // Default if not set
+		}
+
+		return time.Unix(timestamp, 0), count, true, nil
+	}
+
+	return time.Time{}, 0, false, nil
+}
+
+// SetPendingDM marks that a boredom DM was sent and increments the count
 func (s *SurrealStore) SetPendingDM(userID string, sentAt time.Time) error {
+	// First check if record exists to increment count
+	_, currentCount, exists, _ := s.GetPendingDMInfo(userID)
+	newCount := 1
+	if exists {
+		newCount = currentCount + 1
+	}
+
 	query := `
-		INSERT INTO pending_dm (id, user_id, sent_at)
-		VALUES (type::thing("pending_dm", $user_id), $user_id, $sent_at)
-		ON DUPLICATE KEY UPDATE sent_at = $sent_at;
+		INSERT INTO pending_dm (id, user_id, sent_at, dm_count)
+		VALUES (type::thing("pending_dm", $user_id), $user_id, $sent_at, $dm_count)
+		ON DUPLICATE KEY UPDATE sent_at = $sent_at, dm_count = $dm_count;
 	`
 	_, err := s.client.Query(query, map[string]interface{}{
-		"user_id": userID,
-		"sent_at": sentAt.Unix(),
+		"user_id":  userID,
+		"sent_at":  sentAt.Unix(),
+		"dm_count": newCount,
 	})
 	return err
 }
 
-// ClearPendingDM removes the pending DM flag (user responded)
+// ClearPendingDM removes the pending DM flag (user responded) - resets backoff
 func (s *SurrealStore) ClearPendingDM(userID string) error {
 	query := `DELETE type::thing("pending_dm", $user_id);`
 	_, err := s.client.Query(query, map[string]interface{}{"user_id": userID})

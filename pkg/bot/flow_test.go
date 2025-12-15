@@ -189,6 +189,10 @@ func (m *mockMemoryStore) HasPendingDM(userID string) (bool, error) {
 	return false, nil
 }
 
+func (m *mockMemoryStore) GetPendingDMInfo(userID string) (time.Time, int, bool, error) {
+	return time.Time{}, 0, false, nil
+}
+
 func (m *mockMemoryStore) SetPendingDM(userID string, sentAt time.Time) error {
 	return nil
 }

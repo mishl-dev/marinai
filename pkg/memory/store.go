@@ -76,8 +76,9 @@ type Store interface {
 	GetState(key string) (string, error)
 	SetState(key, value string) error
 
-	// Pending DM tracking (Duolingo-style)
+	// Pending DM tracking (with exponential backoff)
 	HasPendingDM(userID string) (bool, error)
+	GetPendingDMInfo(userID string) (sentAt time.Time, dmCount int, exists bool, err error)
 	SetPendingDM(userID string, sentAt time.Time) error
 	ClearPendingDM(userID string) error
 	GetLastInteraction(userID string) (time.Time, error)
@@ -383,6 +384,10 @@ func (vs *FileStore) SetState(key, value string) error {
 
 func (vs *FileStore) HasPendingDM(userID string) (bool, error) {
 	return false, nil
+}
+
+func (vs *FileStore) GetPendingDMInfo(userID string) (time.Time, int, bool, error) {
+	return time.Time{}, 0, false, nil
 }
 
 func (vs *FileStore) SetPendingDM(userID string, sentAt time.Time) error {
