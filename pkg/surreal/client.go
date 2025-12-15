@@ -48,7 +48,17 @@ func (c *Client) Close() {
 }
 
 func (c *Client) Query(sql string, vars interface{}) (interface{}, error) {
-	result, err := surrealdb.Query[interface{}](context.Background(), c.db, sql, vars.(map[string]interface{}))
+	var queryVars map[string]interface{}
+
+	if vars == nil {
+		queryVars = make(map[string]interface{})
+	} else if v, ok := vars.(map[string]interface{}); ok {
+		queryVars = v
+	} else {
+		return nil, fmt.Errorf("vars must be map[string]interface{} or nil, got %T", vars)
+	}
+
+	result, err := surrealdb.Query[interface{}](context.Background(), c.db, sql, queryVars)
 	if err != nil {
 		return nil, err
 	}
