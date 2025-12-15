@@ -200,31 +200,7 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	}
 
 	// Decision Logic: Should I reply?
-	// Always reply in DMs, dedicated channels, or when mentioned
-	shouldReply := isMentioned || isDM || isMarinChannel
-
-	if !shouldReply {
-		// Use Gemini to decide if Marin should respond based on her personality
-		labels := []string{
-			"message directly addressing Marin or Kitagawa",
-			"discussion about cosplay, anime, or games",
-			"discussion about fashion, makeup, or appearance",
-			"discussion about romance or relationships",
-			"someone sharing something they love (hobbies, interests)",
-			"casual conversation or blank message without mention of marin",
-		}
-
-		label, score, err := h.geminiClient.Classify(m.Content, labels)
-		if err != nil {
-			log.Printf("Error classifying message: %v", err)
-		} else {
-			log.Printf("Reply Decision: '%s' (score: %.2f)", label, score)
-			// Reply if it matches her personality triggers (not casual conversation)
-			if label != "casual conversation or blank message without mention of marin" && score > 0.6 {
-				shouldReply = true
-			}
-		}
-	}
+	shouldReply := h.shouldReplyToMessage(m.Content, isMentioned, isDM, isMarinChannel)
 
 	if !shouldReply {
 		// Check for proactive reactions even if not replying
@@ -274,6 +250,89 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	// Parallelize data gathering to reduce latency
 	ctx := h.gatherMessageContext(s, m.Author.ID, m.Content, channel, m.Attachments)
 
+	messages := h.buildConversationMessages(displayName, m.Content, ctx)
+
+	// 6. Generate Reply
+	reply, err := h.cerebrasClient.ChatCompletion(messages)
+	if err != nil {
+		log.Printf("Error getting completion: %v", err)
+		h.sendSplitMessage(s, m.ChannelID, "(I'm having a headache... try again later.)", m.Reference())
+		return
+	}
+
+	h.sendSplitMessage(s, m.ChannelID, reply, m.Reference())
+
+	// 7. Async Updates
+	h.wg.Add(1)
+	go func() {
+		defer h.wg.Done()
+
+		// Add to Rolling Context
+		h.addRecentMessage(m.Author.ID, "user", m.Content)
+		h.addRecentMessage(m.Author.ID, "assistant", reply)
+
+		// Ensure User Profile Exists (for Loneliness/Agency features)
+		if err := h.memoryStore.EnsureUser(m.Author.ID); err != nil {
+			log.Printf("Error ensuring user profile exists: %v", err)
+		}
+
+		// Background Memory Extraction
+		h.extractMemories(m.Author.ID, displayName, m.Content, reply)
+
+		// Calculate affection based on full interaction (user message + Marin's response)
+		// This happens AFTER the response so we can analyze the actual interaction dynamics
+		_, milestoneMsg, randomEventMsg := h.UpdateAffectionForInteraction(m.Author.ID, m.Content, reply, isMentioned, isDM, false, currentMoodForAffection)
+
+		// If there's a milestone or random event, send it as a follow-up DM
+		if milestoneMsg != "" || randomEventMsg != "" {
+			dmChannel, err := s.UserChannelCreate(m.Author.ID)
+			if err == nil && dmChannel != nil {
+				if milestoneMsg != "" {
+					s.ChannelMessageSend(dmChannel.ID, milestoneMsg)
+				}
+				if randomEventMsg != "" && milestoneMsg == "" {
+					// Only send random event if no milestone (to avoid spam)
+					s.ChannelMessageSend(dmChannel.ID, randomEventMsg)
+				}
+			}
+		}
+	}()
+}
+
+// shouldReplyToMessage decides whether the bot should reply to a message
+func (h *Handler) shouldReplyToMessage(content string, isMentioned, isDM, isMarinChannel bool) bool {
+	// Always reply in DMs, dedicated channels, or when mentioned
+	if isMentioned || isDM || isMarinChannel {
+		return true
+	}
+
+	// Use Gemini to decide if Marin should respond based on her personality
+	labels := []string{
+		"message directly addressing Marin or Kitagawa",
+		"discussion about cosplay, anime, or games",
+		"discussion about fashion, makeup, or appearance",
+		"discussion about romance or relationships",
+		"someone sharing something they love (hobbies, interests)",
+		"casual conversation or blank message without mention of marin",
+	}
+
+	label, score, err := h.geminiClient.Classify(content, labels)
+	if err != nil {
+		log.Printf("Error classifying message: %v", err)
+		return false
+	}
+
+	log.Printf("Reply Decision: '%s' (score: %.2f)", label, score)
+	// Reply if it matches her personality triggers (not casual conversation)
+	if label != "casual conversation or blank message without mention of marin" && score > 0.6 {
+		return true
+	}
+
+	return false
+}
+
+// buildConversationMessages constructs the message history and system prompt for the LLM
+func (h *Handler) buildConversationMessages(displayName, userContent string, ctx MessageContext) []cerebras.Message {
 	// Prepare strings from gathered data
 	var retrievedMemories string
 	if len(ctx.Matches) > 0 {
@@ -331,7 +390,7 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 	}
 
 	// Build user message with image context if present
-	userMessage := m.Content
+	userMessage := userContent
 	if ctx.ImageContext != "" {
 		if userMessage == "" {
 			userMessage = ctx.ImageContext
@@ -343,51 +402,7 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 
 	messages = append(messages, cerebras.Message{Role: "user", Content: userMessage})
 
-	// 6. Generate Reply
-	reply, err := h.cerebrasClient.ChatCompletion(messages)
-	if err != nil {
-		log.Printf("Error getting completion: %v", err)
-		h.sendSplitMessage(s, m.ChannelID, "(I'm having a headache... try again later.)", m.Reference())
-		return
-	}
-
-	h.sendSplitMessage(s, m.ChannelID, reply, m.Reference())
-
-	// 7. Async Updates
-	h.wg.Add(1)
-	go func() {
-		defer h.wg.Done()
-
-		// Add to Rolling Context
-		h.addRecentMessage(m.Author.ID, "user", m.Content)
-		h.addRecentMessage(m.Author.ID, "assistant", reply)
-
-		// Ensure User Profile Exists (for Loneliness/Agency features)
-		if err := h.memoryStore.EnsureUser(m.Author.ID); err != nil {
-			log.Printf("Error ensuring user profile exists: %v", err)
-		}
-
-		// Background Memory Extraction
-		h.extractMemories(m.Author.ID, displayName, m.Content, reply)
-		
-		// Calculate affection based on full interaction (user message + Marin's response)
-		// This happens AFTER the response so we can analyze the actual interaction dynamics
-		_, milestoneMsg, randomEventMsg := h.UpdateAffectionForInteraction(m.Author.ID, m.Content, reply, isMentioned, isDM, false, currentMoodForAffection)
-		
-		// If there's a milestone or random event, send it as a follow-up DM
-		if milestoneMsg != "" || randomEventMsg != "" {
-			dmChannel, err := s.UserChannelCreate(m.Author.ID)
-			if err == nil && dmChannel != nil {
-				if milestoneMsg != "" {
-					s.ChannelMessageSend(dmChannel.ID, milestoneMsg)
-				}
-				if randomEventMsg != "" && milestoneMsg == "" {
-					// Only send random event if no milestone (to avoid spam)
-					s.ChannelMessageSend(dmChannel.ID, randomEventMsg)
-				}
-			}
-		}
-	}()
+	return messages
 }
 
 // gatherMessageContext gathers all necessary context data in parallel
