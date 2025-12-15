@@ -435,126 +435,155 @@ func (h *Handler) gatherMessageContext(s Session, userID, content string, channe
 	// 2. Search Memory (RAG)
 	go func() {
 		defer wg.Done()
-		// Generate Embedding for current message
-		emb, err := h.embeddingClient.Embed(content)
-		if err != nil {
-			log.Printf("Error generating embedding: %v", err)
-			return
-		}
-		if emb != nil {
-			var err error
-			ctx.Matches, err = h.memoryStore.Search(userID, emb, 5) // Top 5 relevant memories
-			if err != nil {
-				log.Printf("Error searching memory: %v", err)
-			}
-		}
+		ctx.Matches = h.getMemoryContext(userID, content)
 	}()
 
 	// 3. Emojis
 	go func() {
 		defer wg.Done()
-		if channel != nil && channel.GuildID != "" {
-			emojiList := h.getRelevantEmojis(channel.GuildID, s)
-			if len(emojiList) > 0 {
-				ctx.EmojiText = "Available custom emojis:\n" + strings.Join(emojiList, ", ")
-			}
-		}
+		ctx.EmojiText = h.getEmojiContext(s, channel)
 	}()
 
 	// 4. Fetch User Profile
 	go func() {
 		defer wg.Done()
-		var err error
-		ctx.Facts, err = h.memoryStore.GetFacts(userID)
-		if err != nil {
-			log.Printf("Error fetching user profile: %v", err)
-		}
+		ctx.Facts = h.getUserProfileContext(userID)
 	}()
 
 	// 5. Process Image Attachments (if any)
 	go func() {
 		defer wg.Done()
-		ctx.ImageContext = h.processImageAttachments(attachments)
+		ctx.ImageContext = h.getImageContext(attachments)
 	}()
 
 	// 6. Comeback Context - check if user is returning after boredom DMs
 	go func() {
 		defer wg.Done()
-		_, dmCount, hasPending, err := h.memoryStore.GetPendingDMInfo(userID)
-		if err == nil && hasPending && dmCount > 0 {
-			// User is responding after we sent them boredom DMs!
-			switch dmCount {
-			case 1:
-				ctx.ComebackContext = "COMEBACK: This person is replying after you DMed them once. Be happy they responded!"
-			case 2:
-				ctx.ComebackContext = "COMEBACK: This person is replying after you DMed them TWICE. Tease them gently about finally responding."
-			case 3:
-				ctx.ComebackContext = "COMEBACK: This person is replying after you DMed them THREE times! Be dramatic about how long it took them to respond."
-			case 4:
-				ctx.ComebackContext = "COMEBACK: This person is replying after you DMed them FOUR times! You were about to give up on them. Be relieved/happy but also give them a hard time about it."
-			}
-		}
+		ctx.ComebackContext = h.getComebackContext(userID)
 	}()
 
 	// 7. Time Context - current date/time awareness
 	go func() {
 		defer wg.Done()
-		// Tokyo time for Marin
-		loc := time.FixedZone("Asia/Tokyo", 9*60*60)
-		now := time.Now().In(loc)
-		
-		// Get time of day
-		hour := now.Hour()
-		var timeOfDay string
-		switch {
-		case hour >= 5 && hour < 12:
-			timeOfDay = "morning"
-		case hour >= 12 && hour < 17:
-			timeOfDay = "afternoon"
-		case hour >= 17 && hour < 21:
-			timeOfDay = "evening"
-		default:
-			timeOfDay = "night"
-		}
-		
-		// Get season (Northern Hemisphere / Japan)
-		month := now.Month()
-		var season string
-		switch {
-		case month >= 3 && month <= 5:
-			season = "spring"
-		case month >= 6 && month <= 8:
-			season = "summer"
-		case month >= 9 && month <= 11:
-			season = "autumn"
-		default:
-			season = "winter"
-		}
-		
-		// Check for special days/holidays
-		var specialDay string
-		day := now.Day()
-		switch {
-		case month == 12 && day >= 20 && day <= 26:
-			specialDay = " (Christmas season!)"
-		case month == 12 && day == 31:
-			specialDay = " (New Year's Eve!)"
-		case month == 1 && day == 1:
-			specialDay = " (New Year's Day!)"
-		case month == 2 && day == 14:
-			specialDay = " (Valentine's Day!)"
-		case month == 3 && day == 14:
-			specialDay = " (White Day!)"
-		case month == 10 && day == 31:
-			specialDay = " (Halloween!)"
-		}
-		
-		ctx.TimeContext = fmt.Sprintf("[Current Time: %s, %s %d - %s, %s%s]",
-			timeOfDay, now.Month().String(), day, now.Weekday().String(), season, specialDay)
+		ctx.TimeContext = h.getTimeContext()
 	}()
 
 	wg.Wait()
 	return ctx
+}
+
+func (h *Handler) getMemoryContext(userID, content string) []string {
+	// Generate Embedding for current message
+	emb, err := h.embeddingClient.Embed(content)
+	if err != nil {
+		log.Printf("Error generating embedding: %v", err)
+		return nil
+	}
+	if emb != nil {
+		matches, err := h.memoryStore.Search(userID, emb, 5) // Top 5 relevant memories
+		if err != nil {
+			log.Printf("Error searching memory: %v", err)
+			return nil
+		}
+		return matches
+	}
+	return nil
+}
+
+func (h *Handler) getEmojiContext(s Session, channel *discordgo.Channel) string {
+	if channel != nil && channel.GuildID != "" {
+		emojiList := h.getRelevantEmojis(channel.GuildID, s)
+		if len(emojiList) > 0 {
+			return "Available custom emojis:\n" + strings.Join(emojiList, ", ")
+		}
+	}
+	return ""
+}
+
+func (h *Handler) getUserProfileContext(userID string) []string {
+	facts, err := h.memoryStore.GetFacts(userID)
+	if err != nil {
+		log.Printf("Error fetching user profile: %v", err)
+		return nil
+	}
+	return facts
+}
+
+func (h *Handler) getImageContext(attachments []*discordgo.MessageAttachment) string {
+	return h.processImageAttachments(attachments)
+}
+
+func (h *Handler) getComebackContext(userID string) string {
+	_, dmCount, hasPending, err := h.memoryStore.GetPendingDMInfo(userID)
+	if err == nil && hasPending && dmCount > 0 {
+		// User is responding after we sent them boredom DMs!
+		switch dmCount {
+		case 1:
+			return "COMEBACK: This person is replying after you DMed them once. Be happy they responded!"
+		case 2:
+			return "COMEBACK: This person is replying after you DMed them TWICE. Tease them gently about finally responding."
+		case 3:
+			return "COMEBACK: This person is replying after you DMed them THREE times! Be dramatic about how long it took them to respond."
+		case 4:
+			return "COMEBACK: This person is replying after you DMed them FOUR times! You were about to give up on them. Be relieved/happy but also give them a hard time about it."
+		}
+	}
+	return ""
+}
+
+func (h *Handler) getTimeContext() string {
+	// Tokyo time for Marin
+	loc := time.FixedZone("Asia/Tokyo", 9*60*60)
+	now := time.Now().In(loc)
+
+	// Get time of day
+	hour := now.Hour()
+	var timeOfDay string
+	switch {
+	case hour >= 5 && hour < 12:
+		timeOfDay = "morning"
+	case hour >= 12 && hour < 17:
+		timeOfDay = "afternoon"
+	case hour >= 17 && hour < 21:
+		timeOfDay = "evening"
+	default:
+		timeOfDay = "night"
+	}
+
+	// Get season (Northern Hemisphere / Japan)
+	month := now.Month()
+	var season string
+	switch {
+	case month >= 3 && month <= 5:
+		season = "spring"
+	case month >= 6 && month <= 8:
+		season = "summer"
+	case month >= 9 && month <= 11:
+		season = "autumn"
+	default:
+		season = "winter"
+	}
+
+	// Check for special days/holidays
+	var specialDay string
+	day := now.Day()
+	switch {
+	case month == 12 && day >= 20 && day <= 26:
+		specialDay = " (Christmas season!)"
+	case month == 12 && day == 31:
+		specialDay = " (New Year's Eve!)"
+	case month == 1 && day == 1:
+		specialDay = " (New Year's Day!)"
+	case month == 2 && day == 14:
+		specialDay = " (Valentine's Day!)"
+	case month == 3 && day == 14:
+		specialDay = " (White Day!)"
+	case month == 10 && day == 31:
+		specialDay = " (Halloween!)"
+	}
+
+	return fmt.Sprintf("[Current Time: %s, %s %d - %s, %s%s]",
+		timeOfDay, now.Month().String(), day, now.Weekday().String(), season, specialDay)
 }
 
 func (h *Handler) cleanupLoop() {
