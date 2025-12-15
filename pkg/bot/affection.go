@@ -485,13 +485,17 @@ func (h *Handler) UpdateAffectionForInteraction(userID string, userMessage strin
 	oldAffection, _ := h.memoryStore.GetAffection(userID)
 	oldLevel := GetAffectionLevel(oldAffection)
 
+	// Debug: Log the final calculated gain
+	log.Printf("[Affection] User %s: base=%d, behavior=%+d, mood=%s, streak=%d, final=%d",
+		userID, AffectionGains["message"], behaviorChange, currentMood, streak, gain)
+
 	// Apply the change
 	var milestoneMessage string
 	if gain != 0 {
 		if err := h.memoryStore.AddAffection(userID, gain); err != nil {
 			log.Printf("Error updating affection for %s: %v", userID, err)
-		} else if gain > 5 || gain < 0 {
-			log.Printf("Affection change for %s: %+d (streak: %d, multiplier: %.2f)", userID, gain, streak, streakMultiplier)
+		} else {
+			log.Printf("[Affection] Applied %+d XP to %s (was: %d)", gain, userID, oldAffection)
 		}
 
 		// Check for milestone
@@ -631,7 +635,8 @@ Output ONLY valid JSON. Example: {"sentiment": "neutral"}`, userMessage, marinRe
 		return AffectionPenalties["creepy"]
 
 	default:
-		return 0
+		// Neutral conversations still get a small bonus - any interaction is valuable!
+		return 25
 	}
 }
 
