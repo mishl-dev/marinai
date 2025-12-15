@@ -43,19 +43,19 @@ type Reminder struct {
 }
 
 type Store interface {
-	Add(userId string, text string, vector []float32) error
-	Search(userId string, queryVector []float32, limit int) ([]string, error)
+	Add(userID string, text string, vector []float32) error
+	Search(userID string, queryVector []float32, limit int) ([]string, error)
 	// Recent messages cache
-	AddRecentMessage(userId, role, message string) error
-	GetRecentMessages(userId string) ([]RecentMessageItem, error)
-	ClearRecentMessages(userId string) error
+	AddRecentMessage(userID, role, message string) error
+	GetRecentMessages(userID string) ([]RecentMessageItem, error)
+	ClearRecentMessages(userID string) error
 	// User data management
-	DeleteUserData(userId string) error
+	DeleteUserData(userID string) error
 
 	// Profile management
-	GetFacts(userId string) ([]string, error)
-	ApplyDelta(userId string, adds []string, removes []string) error
-	DeleteFacts(userId string) error
+	GetFacts(userID string) ([]string, error)
+	ApplyDelta(userID string, adds []string, removes []string) error
+	DeleteFacts(userID string) error
 
 	// Emoji Cache
 	GetCachedEmojis(guildID string) ([]string, error)
@@ -66,7 +66,7 @@ type Store interface {
 	EnsureUser(userID string) error
 
 	// Reminders
-	AddReminder(userId string, text string, dueAt int64) error
+	AddReminder(userID string, text string, dueAt int64) error
 	GetDueReminders() ([]Reminder, error)
 	UpdateReminder(reminder Reminder) error
 	DeleteReminder(id string) error
@@ -107,18 +107,18 @@ func NewFileStore(storageDir string) *FileStore {
 	}
 }
 
-func (vs *FileStore) getUserDir(userId string) string {
-	return filepath.Join(vs.storageDir, userId)
+func (vs *FileStore) getUserDir(userID string) string {
+	return filepath.Join(vs.storageDir, userID)
 }
 
-func (vs *FileStore) getFilePath(userId string) string {
-	userDir := vs.getUserDir(userId)
+func (vs *FileStore) getFilePath(userID string) string {
+	userDir := vs.getUserDir(userID)
 	_ = os.MkdirAll(userDir, 0755) // Ensure user directory exists
 	return filepath.Join(userDir, "memory.json")
 }
 
-func (vs *FileStore) load(userId string) ([]MemoryItem, error) {
-	path := vs.getFilePath(userId)
+func (vs *FileStore) load(userID string) ([]MemoryItem, error) {
+	path := vs.getFilePath(userID)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return []MemoryItem{}, nil
 	}
@@ -135,8 +135,8 @@ func (vs *FileStore) load(userId string) ([]MemoryItem, error) {
 	return items, nil
 }
 
-func (vs *FileStore) save(userId string, items []MemoryItem) error {
-	path := vs.getFilePath(userId)
+func (vs *FileStore) save(userID string, items []MemoryItem) error {
+	path := vs.getFilePath(userID)
 	data, err := json.MarshalIndent(items, "", "  ")
 	if err != nil {
 		return err
@@ -144,11 +144,11 @@ func (vs *FileStore) save(userId string, items []MemoryItem) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-func (vs *FileStore) Add(userId string, text string, vector []float32) error {
+func (vs *FileStore) Add(userID string, text string, vector []float32) error {
 	vs.mu.Lock()
 	defer vs.mu.Unlock()
 
-	items, err := vs.load(userId)
+	items, err := vs.load(userID)
 	if err != nil {
 		return err
 	}
@@ -169,14 +169,14 @@ func (vs *FileStore) Add(userId string, text string, vector []float32) error {
 		Timestamp: time.Now().Unix(),
 	})
 
-	return vs.save(userId, items)
+	return vs.save(userID, items)
 }
 
-func (vs *FileStore) Search(userId string, queryVector []float32, limit int) ([]string, error) {
+func (vs *FileStore) Search(userID string, queryVector []float32, limit int) ([]string, error) {
 	vs.mu.RLock()
 	defer vs.mu.RUnlock()
 
-	items, err := vs.load(userId)
+	items, err := vs.load(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -226,14 +226,14 @@ func cosineSimilarity(a, b []float32) float64 {
 
 // Recent messages cache methods
 
-func (vs *FileStore) getRecentFilePath(userId string) string {
-	userDir := vs.getUserDir(userId)
+func (vs *FileStore) getRecentFilePath(userID string) string {
+	userDir := vs.getUserDir(userID)
 	_ = os.MkdirAll(userDir, 0755) // Ensure user directory exists
 	return filepath.Join(userDir, "recent.json")
 }
 
-func (vs *FileStore) loadRecentMessages(userId string) ([]RecentMessageItem, error) {
-	path := vs.getRecentFilePath(userId)
+func (vs *FileStore) loadRecentMessages(userID string) ([]RecentMessageItem, error) {
+	path := vs.getRecentFilePath(userID)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return []RecentMessageItem{}, nil
 	}
@@ -250,8 +250,8 @@ func (vs *FileStore) loadRecentMessages(userId string) ([]RecentMessageItem, err
 	return messages, nil
 }
 
-func (vs *FileStore) saveRecentMessages(userId string, messages []RecentMessageItem) error {
-	path := vs.getRecentFilePath(userId)
+func (vs *FileStore) saveRecentMessages(userID string, messages []RecentMessageItem) error {
+	path := vs.getRecentFilePath(userID)
 	data, err := json.MarshalIndent(messages, "", "  ")
 	if err != nil {
 		return err
@@ -260,11 +260,11 @@ func (vs *FileStore) saveRecentMessages(userId string, messages []RecentMessageI
 }
 
 // AddRecentMessage adds a message to the recent messages cache (max 15)
-func (vs *FileStore) AddRecentMessage(userId, role, message string) error {
+func (vs *FileStore) AddRecentMessage(userID, role, message string) error {
 	vs.mu.Lock()
 	defer vs.mu.Unlock()
 
-	messages, err := vs.loadRecentMessages(userId)
+	messages, err := vs.loadRecentMessages(userID)
 	if err != nil {
 		return err
 	}
@@ -280,23 +280,23 @@ func (vs *FileStore) AddRecentMessage(userId, role, message string) error {
 		messages = messages[len(messages)-15:]
 	}
 
-	return vs.saveRecentMessages(userId, messages)
+	return vs.saveRecentMessages(userID, messages)
 }
 
 // GetRecentMessages retrieves the recent messages for a user
-func (vs *FileStore) GetRecentMessages(userId string) ([]RecentMessageItem, error) {
+func (vs *FileStore) GetRecentMessages(userID string) ([]RecentMessageItem, error) {
 	vs.mu.RLock()
 	defer vs.mu.RUnlock()
 
-	return vs.loadRecentMessages(userId)
+	return vs.loadRecentMessages(userID)
 }
 
 // ClearRecentMessages clears the recent messages cache for a user
-func (vs *FileStore) ClearRecentMessages(userId string) error {
+func (vs *FileStore) ClearRecentMessages(userID string) error {
 	vs.mu.Lock()
 	defer vs.mu.Unlock()
 
-	path := vs.getRecentFilePath(userId)
+	path := vs.getRecentFilePath(userID)
 	// Remove the file if it exists
 	if _, err := os.Stat(path); err == nil {
 		return os.Remove(path)
@@ -305,11 +305,11 @@ func (vs *FileStore) ClearRecentMessages(userId string) error {
 }
 
 // DeleteUserData deletes all data for a user (memory + recent messages)
-func (vs *FileStore) DeleteUserData(userId string) error {
+func (vs *FileStore) DeleteUserData(userID string) error {
 	vs.mu.Lock()
 	defer vs.mu.Unlock()
 
-	userDir := vs.getUserDir(userId)
+	userDir := vs.getUserDir(userID)
 	// Remove the entire user directory if it exists
 	if _, err := os.Stat(userDir); err == nil {
 		return os.RemoveAll(userDir)
@@ -319,17 +319,17 @@ func (vs *FileStore) DeleteUserData(userId string) error {
 
 // Profile management (FileStore implementation - simplified for compatibility)
 
-func (vs *FileStore) GetFacts(userId string) ([]string, error) {
+func (vs *FileStore) GetFacts(userID string) ([]string, error) {
 	// For FileStore, we can just return empty for now as we are moving to SurrealDB
 	// Or implement a simple JSON file if needed.
 	return []string{}, nil
 }
 
-func (vs *FileStore) ApplyDelta(userId string, adds []string, removes []string) error {
+func (vs *FileStore) ApplyDelta(userID string, adds []string, removes []string) error {
 	return nil
 }
 
-func (vs *FileStore) DeleteFacts(userId string) error {
+func (vs *FileStore) DeleteFacts(userID string) error {
 	return nil
 }
 
@@ -351,7 +351,7 @@ func (vs *FileStore) EnsureUser(userID string) error {
 	return nil
 }
 
-func (vs *FileStore) AddReminder(userId string, text string, dueAt int64) error {
+func (vs *FileStore) AddReminder(userID string, text string, dueAt int64) error {
 	return nil
 }
 

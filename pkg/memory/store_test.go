@@ -15,36 +15,36 @@ func TestFileStore(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	store := NewFileStore(tmpDir)
-	userId := "test_user"
+	userID := "test_user"
 
 	// Test Add
-	err = store.Add(userId, "Hello world", []float32{1.0, 0.0, 0.0})
+	err = store.Add(userID, "Hello world", []float32{1.0, 0.0, 0.0})
 	assert.NoError(t, err, "Failed to add item")
 
-	err = store.Add(userId, "Pizza is good", []float32{0.0, 1.0, 0.0})
+	err = store.Add(userID, "Pizza is good", []float32{0.0, 1.0, 0.0})
 	assert.NoError(t, err, "Failed to add second item")
 
 	// Test Search (Exact match)
-	results, err := store.Search(userId, []float32{1.0, 0.0, 0.0}, 1)
+	results, err := store.Search(userID, []float32{1.0, 0.0, 0.0}, 1)
 	assert.NoError(t, err, "Failed to search")
 	require.Len(t, results, 1, "Expected 1 result")
 	assert.Equal(t, "Hello world", results[0], "Expected 'Hello world'")
 
 	// Test Search (Similarity)
 	// Vector {0.1, 0.9, 0.0} should be closer to {0.0, 1.0, 0.0} than {1.0, 0.0, 0.0}
-	results, err = store.Search(userId, []float32{0.1, 0.9, 0.0}, 1)
+	results, err = store.Search(userID, []float32{0.1, 0.9, 0.0}, 1)
 	assert.NoError(t, err, "Failed to search")
 	require.Len(t, results, 1, "Expected 1 result")
 	assert.Equal(t, "Pizza is good", results[0], "Expected 'Pizza is good'")
 
 	// Test Recent Messages
-	err = store.AddRecentMessage(userId, "user", "Test message 1")
+	err = store.AddRecentMessage(userID, "user", "Test message 1")
 	assert.NoError(t, err, "Failed to add recent message")
 
-	err = store.AddRecentMessage(userId, "assistant", "Test message 2")
+	err = store.AddRecentMessage(userID, "assistant", "Test message 2")
 	assert.NoError(t, err, "Failed to add second recent message")
 
-	recent, err := store.GetRecentMessages(userId)
+	recent, err := store.GetRecentMessages(userID)
 	assert.NoError(t, err, "Failed to get recent messages")
 	require.Len(t, recent, 2, "Expected 2 recent messages")
 	if len(recent) > 0 {
@@ -53,18 +53,18 @@ func TestFileStore(t *testing.T) {
 	}
 
 	// Test Clear Recent Messages
-	err = store.ClearRecentMessages(userId)
+	err = store.ClearRecentMessages(userID)
 	assert.NoError(t, err, "Failed to clear recent messages")
 
-	recent, err = store.GetRecentMessages(userId)
+	recent, err = store.GetRecentMessages(userID)
 	assert.NoError(t, err, "Failed to get recent messages after clear")
 	assert.Empty(t, recent, "Expected 0 recent messages after clear")
 
 	// Test Delete User Data
-	err = store.DeleteUserData(userId)
+	err = store.DeleteUserData(userID)
 	assert.NoError(t, err, "Failed to delete user data")
 
-	results, err = store.Search(userId, []float32{1.0, 0.0, 0.0}, 1)
+	results, err = store.Search(userID, []float32{1.0, 0.0, 0.0}, 1)
 	assert.NoError(t, err, "Failed to search after delete")
 	assert.Empty(t, results, "Expected 0 results after delete")
 }

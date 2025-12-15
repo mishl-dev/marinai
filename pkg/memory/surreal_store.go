@@ -153,9 +153,9 @@ func (s *SurrealStore) SetCachedEmojis(guildID string, emojis []string) error {
 	return err
 }
 
-func (s *SurrealStore) detectDuplicate(userId string, vector []float32, threshold float64) (bool, float64, string, error) {
+func (s *SurrealStore) detectDuplicate(userID string, vector []float32, threshold float64) (bool, float64, string, error) {
 	rows, err := s.client.VectorSearch("memories", "vector", vector, 1, map[string]interface{}{
-		"user_id": userId,
+		"user_id": userID,
 	})
 	if err != nil {
 		return false, 0, "", err
@@ -189,10 +189,10 @@ func (s *SurrealStore) detectDuplicate(userId string, vector []float32, threshol
 	return false, simScore, existingText, nil
 }
 
-func (s *SurrealStore) Add(userId string, text string, vector []float32) error {
+func (s *SurrealStore) Add(userID string, text string, vector []float32) error {
 	const duplicateThreshold = 0.8
 
-	isDup, sim, existingText, err := s.detectDuplicate(userId, vector, duplicateThreshold)
+	isDup, sim, existingText, err := s.detectDuplicate(userID, vector, duplicateThreshold)
 	if err != nil {
 		log.Printf("[DEBUG] Error checking for duplicates: %v", err)
 	} else if isDup {
@@ -203,7 +203,7 @@ func (s *SurrealStore) Add(userId string, text string, vector []float32) error {
 	}
 
 	item := SurrealMemoryItem{
-		UserID:    userId,
+		UserID:    userID,
 		Text:      text,
 		Embedding: vector,
 		Timestamp: time.Now().Unix(),
@@ -213,12 +213,12 @@ func (s *SurrealStore) Add(userId string, text string, vector []float32) error {
 	return err
 }
 
-func (s *SurrealStore) Search(userId string, queryVector []float32, limit int) ([]string, error) {
-	log.Printf("[DEBUG] Search called: userId=%s, vectorLen=%d, limit=%d", userId, len(queryVector), limit)
+func (s *SurrealStore) Search(userID string, queryVector []float32, limit int) ([]string, error) {
+	log.Printf("[DEBUG] Search called: userID=%s, vectorLen=%d, limit=%d", userID, len(queryVector), limit)
 
 	// Use the client's VectorSearch method to avoid raw queries in the store
 	rows, err := s.client.VectorSearch("memories", "vector", queryVector, limit, map[string]interface{}{
-		"user_id": userId,
+		"user_id": userID,
 	})
 	if err != nil {
 		log.Printf("[DEBUG] VectorSearch error: %v", err)
@@ -262,10 +262,10 @@ func (s *SurrealStore) Search(userId string, queryVector []float32, limit int) (
 
 // Recent messages cache
 
-func (s *SurrealStore) AddRecentMessage(userId, role, message string) error {
+func (s *SurrealStore) AddRecentMessage(userID, role, message string) error {
 	// Use a map or a local struct since we need UserID which is not in the interface struct
 	item := map[string]interface{}{
-		"user_id":   userId,
+		"user_id":   userID,
 		"role":      role,
 		"text":      message,
 		"timestamp": time.Now().UnixNano(),
@@ -294,13 +294,13 @@ func (s *SurrealStore) AddRecentMessage(userId, role, message string) error {
 				)
 			);
 		`
-		_, err = s.client.Query(query, map[string]interface{}{"user_id": userId})
+		_, err = s.client.Query(query, map[string]interface{}{"user_id": userID})
 		return err
 	}
 	return nil
 }
 
-func (s *SurrealStore) GetRecentMessages(userId string) ([]RecentMessageItem, error) {
+func (s *SurrealStore) GetRecentMessages(userID string) ([]RecentMessageItem, error) {
 	// ⚡ Bolt: Use DESC order with LIMIT to ensure fast reads regardless of table size
 	// We fetch the 20 most recent messages (DESC) and then reverse them in Go.
 	query := `
@@ -310,7 +310,7 @@ func (s *SurrealStore) GetRecentMessages(userId string) ([]RecentMessageItem, er
 		LIMIT 20;
 	`
 
-	result, err := s.client.Query(query, map[string]interface{}{"user_id": userId})
+	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
 	if err != nil {
 		return nil, err
 	}
@@ -355,17 +355,17 @@ func (s *SurrealStore) GetRecentMessages(userId string) ([]RecentMessageItem, er
 	return messages, nil
 }
 
-func (s *SurrealStore) ClearRecentMessages(userId string) error {
+func (s *SurrealStore) ClearRecentMessages(userID string) error {
 	query := `DELETE recent_messages WHERE user_id = $user_id;`
-	_, err := s.client.Query(query, map[string]interface{}{"user_id": userId})
+	_, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
 	return err
 }
 
 // Reminders
 
-func (s *SurrealStore) AddReminder(userId string, text string, dueAt int64) error {
+func (s *SurrealStore) AddReminder(userID string, text string, dueAt int64) error {
 	reminder := Reminder{
-		UserID:    userId,
+		UserID:    userID,
 		Text:      text,
 		DueAt:     dueAt,
 		CreatedAt: time.Now().Unix(),
@@ -577,38 +577,38 @@ func (s *SurrealStore) GetAllKnownUsers() ([]string, error) {
 	return []string{}, nil
 }
 
-func (s *SurrealStore) EnsureUser(userId string) error {
+func (s *SurrealStore) EnsureUser(userID string) error {
 	query := `
 		INSERT INTO user_profiles (id, user_id, facts, last_updated, last_interaction)
 		VALUES (type::thing("user_profiles", $user_id), $user_id, [], time::unix(), 0)
 		ON DUPLICATE KEY UPDATE last_updated = time::unix();
 	`
 	_, err := s.client.Query(query, map[string]interface{}{
-		"user_id": userId,
+		"user_id": userID,
 	})
 	return err
 }
 
-func (s *SurrealStore) DeleteUserData(userId string) error {
+func (s *SurrealStore) DeleteUserData(userID string) error {
 	query := `
 		DELETE memories WHERE user_id = $user_id;
 		DELETE recent_messages WHERE user_id = $user_id;
 		DELETE user_profiles WHERE user_id = $user_id;
 		DELETE reminders WHERE user_id = $user_id;
 	`
-	_, err := s.client.Query(query, map[string]interface{}{"user_id": userId})
+	_, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
 	return err
 }
 
 // Profile management
 
-func (s *SurrealStore) GetFacts(userId string) ([]string, error) {
-	// Direct record lookup: user_profiles:<userId>
-	// Note: In SurrealDB, record IDs are `table:id`. We assume userId is safe to use as ID part.
-	// If userId contains special chars, we might need to escape or hash it, but for Discord IDs (snowflakes) it's fine.
+func (s *SurrealStore) GetFacts(userID string) ([]string, error) {
+	// Direct record lookup: user_profiles:<userID>
+	// Note: In SurrealDB, record IDs are `table:id`. We assume userID is safe to use as ID part.
+	// If userID contains special chars, we might need to escape or hash it, but for Discord IDs (snowflakes) it's fine.
 	query := `SELECT facts FROM user_profiles WHERE id = type::thing("user_profiles", $user_id);`
 
-	result, err := s.client.Query(query, map[string]interface{}{"user_id": userId})
+	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
 	if err != nil {
 		return nil, err
 	}
@@ -654,7 +654,7 @@ func (s *SurrealStore) GetFacts(userId string) ([]string, error) {
 	return facts, nil
 }
 
-func (s *SurrealStore) ApplyDelta(userId string, adds []string, removes []string) error {
+func (s *SurrealStore) ApplyDelta(userID string, adds []string, removes []string) error {
 	// Ensure adds and removes are not nil
 	if adds == nil {
 		adds = []string{}
@@ -700,14 +700,14 @@ func (s *SurrealStore) ApplyDelta(userId string, adds []string, removes []string
 	`, string(removesJson), string(removesJson), string(addsJson))
 
 	_, err := s.client.Query(query, map[string]interface{}{
-		"user_id": userId,
+		"user_id": userID,
 	})
 	return err
 }
 
-func (s *SurrealStore) DeleteFacts(userId string) error {
+func (s *SurrealStore) DeleteFacts(userID string) error {
 	query := `DELETE type::thing("user_profiles", $user_id);`
-	_, err := s.client.Query(query, map[string]interface{}{"user_id": userId})
+	_, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
 	return err
 }
 
