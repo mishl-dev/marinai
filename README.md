@@ -286,6 +286,22 @@ marinai/
 go test ./...
 ```
 
+### 🛠️ Developer Tools
+
+We provide a script to automatically check your development environment and run verification steps:
+
+```bash
+./scripts/dev-check.sh
+```
+
+This script will:
+- Check for Go installation and version
+- Verify configuration files exist
+- Run `go mod tidy`
+- Check code formatting (`go fmt`)
+- Run static analysis (`go vet`)
+- Run tests (uses `gotestsum` if installed, otherwise `go test`)
+
 ### Project Structure
 
 | Package | Purpose |

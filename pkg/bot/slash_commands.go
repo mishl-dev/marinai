@@ -278,7 +278,6 @@ func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.Inter
 	}
 }
 
-
 // InteractionCreate handles all slash command interactions
 func (h *Handler) InteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	// Only handle application commands (slash commands)

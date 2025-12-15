@@ -315,7 +315,7 @@ Output ONLY valid JSON. Example: {"label": "neutral", "confidence": 0.85}`, labe
 
 	// Parse the JSON response
 	responseText := strings.TrimSpace(geminiResp.Candidates[0].Content.Parts[0].Text)
-	
+
 	// Strip markdown code blocks if present
 	if strings.HasPrefix(responseText, "```") {
 		lines := strings.Split(responseText, "\n")

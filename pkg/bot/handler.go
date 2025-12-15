@@ -106,7 +106,6 @@ func (h *Handler) SetBotID(id string) {
 	h.botID = id
 }
 
-
 func (h *Handler) ResetMemory(userId string) error {
 	if err := h.memoryStore.ClearRecentMessages(userId); err != nil {
 		log.Printf("Error clearing recent messages: %v", err)
@@ -264,7 +263,7 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 			defer h.wg.Done()
 			h.addRecentMessage(m.Author.ID, "user", m.Content)
 			h.addRecentMessage(m.Author.ID, "assistant", refusal)
-			
+
 			// Calculate affection based on full interaction (user message + Marin's response)
 			h.UpdateAffectionForInteraction(m.Author.ID, m.Content, refusal, isMentioned, isDM, false, currentMoodForAffection)
 		}()
@@ -369,11 +368,11 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 
 		// Background Memory Extraction
 		h.extractMemories(m.Author.ID, displayName, m.Content, reply)
-		
+
 		// Calculate affection based on full interaction (user message + Marin's response)
 		// This happens AFTER the response so we can analyze the actual interaction dynamics
 		_, milestoneMsg, randomEventMsg := h.UpdateAffectionForInteraction(m.Author.ID, m.Content, reply, isMentioned, isDM, false, currentMoodForAffection)
-		
+
 		// If there's a milestone or random event, send it as a follow-up DM
 		if milestoneMsg != "" || randomEventMsg != "" {
 			dmChannel, err := s.UserChannelCreate(m.Author.ID)
@@ -463,7 +462,3 @@ func (h *Handler) cleanupLoop() {
 		}
 	}
 }
-
-
-
-

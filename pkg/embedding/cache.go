@@ -8,13 +8,13 @@ import (
 
 // CachedClient wraps an embedding client with an in-memory LRU cache
 type CachedClient struct {
-	client   *Client
-	cache    map[string][]float32
-	order    []string // For LRU eviction
-	maxSize  int
-	mu       sync.RWMutex
-	hits     int
-	misses   int
+	client  *Client
+	cache   map[string][]float32
+	order   []string // For LRU eviction
+	maxSize int
+	mu      sync.RWMutex
+	hits    int
+	misses  int
 }
 
 // NewCachedClient creates a cached wrapper around the embedding client
