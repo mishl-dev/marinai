@@ -38,14 +38,46 @@ var SlashCommandHandlers = map[string]func(h *Handler, s *discordgo.Session, i *
 
 // handleResetCommand handles the /reset slash command
 func handleResetCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
-	// Get user ID (works for both guild and DM contexts)
+	// Send confirmation dialog
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: "Are you sure you want to reset your memory? This cannot be undone.",
+			Flags:   discordgo.MessageFlagsEphemeral,
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{
+							Label:    "Confirm Reset",
+							Style:    discordgo.DangerButton,
+							CustomID: "reset_confirm",
+						},
+						discordgo.Button{
+							Label:    "Cancel",
+							Style:    discordgo.SecondaryButton,
+							CustomID: "reset_cancel",
+						},
+					},
+				},
+			},
+		},
+	})
+
+	if err != nil {
+		log.Printf("Error responding to reset command: %v", err)
+	}
+}
+
+// handleResetConfirm handles the confirmation of memory reset
+func handleResetConfirm(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+	// Get user ID
 	var userID string
 	if i.Member != nil {
 		userID = i.Member.User.ID
 	} else if i.User != nil {
 		userID = i.User.ID
 	} else {
-		log.Printf("Error: Could not determine user ID for reset command")
+		log.Printf("Error: Could not determine user ID for reset confirm")
 		return
 	}
 
@@ -58,17 +90,32 @@ func handleResetCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 		responseContent = "Ugh, something went wrong trying to reset your memory... Try again later?"
 	}
 
-	// Respond to the interaction
+	// Respond to the interaction (update message to remove buttons)
 	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Type: discordgo.InteractionResponseUpdateMessage,
 		Data: &discordgo.InteractionResponseData{
-			Content: responseContent,
-			Flags:   discordgo.MessageFlagsEphemeral, // Only visible to the user who ran the command
+			Content:    responseContent,
+			Components: []discordgo.MessageComponent{}, // Remove buttons
 		},
 	})
 
 	if err != nil {
-		log.Printf("Error responding to reset command: %v", err)
+		log.Printf("Error responding to reset confirm: %v", err)
+	}
+}
+
+// handleResetCancel handles the cancellation of memory reset
+func handleResetCancel(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseUpdateMessage,
+		Data: &discordgo.InteractionResponseData{
+			Content:    "Reset cancelled! Keeping everything as is. ✨",
+			Components: []discordgo.MessageComponent{}, // Remove buttons
+		},
+	})
+
+	if err != nil {
+		log.Printf("Error responding to reset cancel: %v", err)
 	}
 }
 
@@ -281,18 +328,26 @@ func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.Inter
 
 // InteractionCreate handles all slash command interactions
 func (h *Handler) InteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	// Only handle application commands (slash commands)
-	if i.Type != discordgo.InteractionApplicationCommand {
+	// Handle slash commands
+	if i.Type == discordgo.InteractionApplicationCommand {
+		commandName := i.ApplicationCommandData().Name
+		if handler, ok := SlashCommandHandlers[commandName]; ok {
+			handler(h, s, i)
+		} else {
+			log.Printf("Unknown slash command: %s", commandName)
+		}
 		return
 	}
 
-	commandName := i.ApplicationCommandData().Name
-
-	// Find and execute the appropriate handler
-	if handler, ok := SlashCommandHandlers[commandName]; ok {
-		handler(h, s, i)
-	} else {
-		log.Printf("Unknown slash command: %s", commandName)
+	// Handle component interactions (buttons)
+	if i.Type == discordgo.InteractionMessageComponent {
+		switch i.MessageComponentData().CustomID {
+		case "reset_confirm":
+			handleResetConfirm(h, s, i)
+		case "reset_cancel":
+			handleResetCancel(h, s, i)
+		}
+		return
 	}
 }
 
