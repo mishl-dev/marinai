@@ -29,7 +29,7 @@ func (ta *TaskAgent) CheckTask(userMsg string) (bool, string) {
 		"requesting for long writing task",
 	}
 
-	label, score, err := ta.geminiClient.Classify(userMsg, labels)
+	label, score, err := ta.cerebrasClient.Classify(userMsg, labels)
 	if err != nil {
 		log.Printf("Error classifying task: %v", err)
 		// Fallback to assuming it's safe if classifier fails

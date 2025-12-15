@@ -317,7 +317,7 @@ func (h *Handler) shouldReplyToMessage(content string, isMentioned, isDM, isMari
 		"casual conversation or blank message without mention of marin",
 	}
 
-	label, score, err := h.geminiClient.Classify(content, labels)
+	label, score, err := h.cerebrasClient.Classify(content, labels)
 	if err != nil {
 		log.Printf("Error classifying message: %v", err)
 		return false

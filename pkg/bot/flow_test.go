@@ -17,6 +17,7 @@ import (
 // Mock Cerebras Client
 type mockCerebrasClient struct {
 	ChatCompletionFunc func(messages []cerebras.Message) (string, error)
+	ClassifyFunc       func(text string, labels []string) (string, float64, error)
 }
 
 func (m *mockCerebrasClient) ChatCompletion(messages []cerebras.Message) (string, error) {
@@ -24,6 +25,17 @@ func (m *mockCerebrasClient) ChatCompletion(messages []cerebras.Message) (string
 		return m.ChatCompletionFunc(messages)
 	}
 	return "Default mock response", nil
+}
+
+func (m *mockCerebrasClient) Classify(text string, labels []string) (string, float64, error) {
+	if m.ClassifyFunc != nil {
+		return m.ClassifyFunc(text, labels)
+	}
+	// Default: return first label with high confidence
+	if len(labels) > 0 {
+		return labels[0], 0.85, nil
+	}
+	return "neutral", 0.5, nil
 }
 
 // Mock Embedding Client

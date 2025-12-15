@@ -50,6 +50,7 @@ func (s *DiscordSession) UpdateStatusComplex(usd discordgo.UpdateStatusData) err
 
 type CerebrasClient interface {
 	ChatCompletion(messages []cerebras.Message) (string, error)
+	Classify(text string, labels []string) (string, float64, error)
 }
 
 type EmbeddingClient interface {
