@@ -139,18 +139,11 @@ func main() {
 
 	// Register slash commands (empty string = global, or specify guild ID for faster testing)
 	// For production, use "" for global commands. For development, use a specific guild ID for instant updates.
+	// Commands persist across restarts - Discord's API is idempotent for registration.
 	guildID := os.Getenv("DISCORD_GUILD_ID") // Optional: set this for faster command updates during development
-	registeredCommands, err := bot.RegisterSlashCommands(dg, guildID)
-	if err != nil {
+	if _, err := bot.RegisterSlashCommands(dg, guildID); err != nil {
 		log.Fatalf("Error registering slash commands: %v", err)
 	}
-
-	// Cleanup function to unregister commands on shutdown
-	defer func() {
-		if err := bot.UnregisterSlashCommands(dg, guildID, registeredCommands); err != nil {
-			log.Printf("Error unregistering slash commands: %v", err)
-		}
-	}()
 
 	log.Println("Marin is now running. Press CTRL-C to exit.")
 
