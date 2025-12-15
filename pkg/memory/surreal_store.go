@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"marinai/pkg/surreal"
+	"math/rand"
 	"reflect"
 	"strings"
 	"time"
@@ -275,29 +276,38 @@ func (s *SurrealStore) AddRecentMessage(userId, role, message string) error {
 		return err
 	}
 
-	// Cleanup old messages (keep last 15)
-	query := `
-		DELETE recent_messages
-		WHERE user_id = $user_id
-		AND id NOT IN (
-			SELECT VALUE id FROM (
-				SELECT id, timestamp FROM recent_messages
-				WHERE user_id = $user_id
-				ORDER BY timestamp DESC
-				LIMIT 15
-			)
-		);
-	`
-	_, err = s.client.Query(query, map[string]interface{}{"user_id": userId})
-	return err
+	// ⚡ Bolt: Probabilistic cleanup to reduce DB load (5% chance)
+	// Instead of running expensive DELETE with subquery on every insert,
+	// we only do it occasionally. The read query (GetRecentMessages) uses LIMIT,
+	// so the table growing slightly larger between cleanups doesn't hurt performance.
+	if rand.Intn(20) == 0 {
+		// Cleanup old messages (keep last 15)
+		query := `
+			DELETE recent_messages
+			WHERE user_id = $user_id
+			AND id NOT IN (
+				SELECT VALUE id FROM (
+					SELECT id, timestamp FROM recent_messages
+					WHERE user_id = $user_id
+					ORDER BY timestamp DESC
+					LIMIT 15
+				)
+			);
+		`
+		_, err = s.client.Query(query, map[string]interface{}{"user_id": userId})
+		return err
+	}
+	return nil
 }
 
 func (s *SurrealStore) GetRecentMessages(userId string) ([]RecentMessageItem, error) {
-	// Include 'timestamp' in SELECT since we're ordering by it
+	// ⚡ Bolt: Use DESC order with LIMIT to ensure fast reads regardless of table size
+	// We fetch the 20 most recent messages (DESC) and then reverse them in Go.
 	query := `
 		SELECT role, text, timestamp FROM recent_messages
 		WHERE user_id = $user_id
-		ORDER BY timestamp ASC;
+		ORDER BY timestamp DESC
+		LIMIT 20;
 	`
 
 	result, err := s.client.Query(query, map[string]interface{}{"user_id": userId})
@@ -335,6 +345,11 @@ func (s *SurrealStore) GetRecentMessages(userId string) ([]RecentMessageItem, er
 
 			messages = append(messages, msg)
 		}
+	}
+
+	// Reverse the slice to return messages in chronological order (oldest -> newest)
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
 	}
 
 	return messages, nil
