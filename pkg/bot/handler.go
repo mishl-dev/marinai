@@ -107,11 +107,11 @@ func (h *Handler) SetBotID(id string) {
 }
 
 
-func (h *Handler) ResetMemory(userId string) error {
-	if err := h.memoryStore.ClearRecentMessages(userId); err != nil {
+func (h *Handler) ResetMemory(userID string) error {
+	if err := h.memoryStore.ClearRecentMessages(userID); err != nil {
 		log.Printf("Error clearing recent messages: %v", err)
 	}
-	if err := h.memoryStore.DeleteUserData(userId); err != nil {
+	if err := h.memoryStore.DeleteUserData(userID); err != nil {
 		log.Printf("Error deleting user data: %v", err)
 	}
 	return nil

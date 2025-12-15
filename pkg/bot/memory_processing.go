@@ -10,14 +10,14 @@ import (
 	"time"
 )
 
-func (h *Handler) addRecentMessage(userId, role, message string) {
-	if err := h.memoryStore.AddRecentMessage(userId, role, message); err != nil {
+func (h *Handler) addRecentMessage(userID, role, message string) {
+	if err := h.memoryStore.AddRecentMessage(userID, role, message); err != nil {
 		log.Printf("Error adding recent message: %v", err)
 	}
 }
 
-func (h *Handler) getRecentMessages(userId string) []memory.RecentMessageItem {
-	messages, err := h.memoryStore.GetRecentMessages(userId)
+func (h *Handler) getRecentMessages(userID string) []memory.RecentMessageItem {
+	messages, err := h.memoryStore.GetRecentMessages(userID)
 	if err != nil {
 		log.Printf("Error getting recent messages: %v", err)
 		return []memory.RecentMessageItem{}
@@ -25,7 +25,7 @@ func (h *Handler) getRecentMessages(userId string) []memory.RecentMessageItem {
 	return messages
 }
 
-func (h *Handler) extractMemories(userId string, userName string, userMessage string, botReply string) {
+func (h *Handler) extractMemories(userID string, userName string, userMessage string, botReply string) {
 	// ---------------------------------------------------------
 	// 1. Basic Filter (Save compute on trivial messages)
 	// ---------------------------------------------------------
@@ -42,7 +42,7 @@ func (h *Handler) extractMemories(userId string, userName string, userMessage st
 	// ---------------------------------------------------------
 	// 2. Fetch Existing Facts
 	// ---------------------------------------------------------
-	existingFacts, err := h.memoryStore.GetFacts(userId)
+	existingFacts, err := h.memoryStore.GetFacts(userID)
 	if err != nil {
 		log.Printf("Error fetching facts for extraction: %v", err)
 		return
@@ -151,8 +151,8 @@ Output ONLY valid JSON with "add", "remove", and "reminders" arrays.`,
 	// 6. Apply Delta
 	// ---------------------------------------------------------
 	if len(delta.Add) > 0 || len(delta.Remove) > 0 {
-		log.Printf("Applying memory delta for user %s: +%v, -%v", userId, delta.Add, delta.Remove)
-		if err := h.memoryStore.ApplyDelta(userId, delta.Add, delta.Remove); err != nil {
+		log.Printf("Applying memory delta for user %s: +%v, -%v", userID, delta.Add, delta.Remove)
+		if err := h.memoryStore.ApplyDelta(userID, delta.Add, delta.Remove); err != nil {
 			log.Printf("Error applying memory delta: %v", err)
 		}
 	}
@@ -163,8 +163,8 @@ Output ONLY valid JSON with "add", "remove", and "reminders" arrays.`,
 	for _, r := range delta.Reminders {
 		if r.DelaySeconds > 0 {
 			dueAt := time.Now().Unix() + r.DelaySeconds
-			log.Printf("Adding reminder for user %s: %s at %d (in %d seconds)", userId, r.Text, dueAt, r.DelaySeconds)
-			if err := h.memoryStore.AddReminder(userId, r.Text, dueAt); err != nil {
+			log.Printf("Adding reminder for user %s: %s at %d (in %d seconds)", userID, r.Text, dueAt, r.DelaySeconds)
+			if err := h.memoryStore.AddReminder(userID, r.Text, dueAt); err != nil {
 				log.Printf("Error adding reminder: %v", err)
 			}
 		}

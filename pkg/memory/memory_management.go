@@ -10,10 +10,10 @@ import (
 )
 
 // GetFactsWithTimestamps returns facts with their creation timestamps
-func (s *SurrealStore) GetFactsWithTimestamps(userId string) ([]FactItem, error) {
+func (s *SurrealStore) GetFactsWithTimestamps(userID string) ([]FactItem, error) {
 	query := `SELECT facts FROM type::thing("user_profiles", $user_id);`
 
-	result, err := s.client.Query(query, map[string]interface{}{"user_id": userId})
+	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
 	if err != nil {
 		return nil, err
 	}
@@ -56,10 +56,10 @@ func (s *SurrealStore) GetFactsWithTimestamps(userId string) ([]FactItem, error)
 }
 
 // ArchiveFact moves a fact from user_profiles to vector memories
-func (s *SurrealStore) ArchiveFact(userId, factText string, embedding []float32) error {
+func (s *SurrealStore) ArchiveFact(userID, factText string, embedding []float32) error {
 	// Add to vector memories
 	item := SurrealMemoryItem{
-		UserID:    userId,
+		UserID:    userID,
 		Text:      factText,
 		Embedding: embedding,
 		Timestamp: time.Now().Unix(),
@@ -78,7 +78,7 @@ func (s *SurrealStore) ArchiveFact(userId, factText string, embedding []float32)
 	`
 
 	_, err = s.client.Query(query, map[string]interface{}{
-		"user_id":   userId,
+		"user_id":   userID,
 		"fact_text": factText,
 	})
 
@@ -86,9 +86,9 @@ func (s *SurrealStore) ArchiveFact(userId, factText string, embedding []float32)
 }
 
 // SummarizeFacts uses LLM to consolidate facts
-func (s *SurrealStore) SummarizeFacts(userId string, cerebrasClient CerebrasClient) ([]string, error) {
+func (s *SurrealStore) SummarizeFacts(userID string, cerebrasClient CerebrasClient) ([]string, error) {
 	// Get all facts
-	factItems, err := s.GetFactsWithTimestamps(userId)
+	factItems, err := s.GetFactsWithTimestamps(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -153,9 +153,9 @@ Return ONLY a JSON array of strings with the consolidated facts. Example: ["fact
 }
 
 // MaintainUserProfile performs aging and summarization on a user's profile
-func (s *SurrealStore) MaintainUserProfile(userId string, embeddingClient EmbeddingClient, cerebrasClient CerebrasClient, agingDays int, summarizationThreshold int) (archivedCount int, summarized bool, err error) {
+func (s *SurrealStore) MaintainUserProfile(userID string, embeddingClient EmbeddingClient, cerebrasClient CerebrasClient, agingDays int, summarizationThreshold int) (archivedCount int, summarized bool, err error) {
 	// Get facts with timestamps
-	factItems, err := s.GetFactsWithTimestamps(userId)
+	factItems, err := s.GetFactsWithTimestamps(userID)
 	if err != nil {
 		return 0, false, err
 	}
@@ -185,20 +185,20 @@ func (s *SurrealStore) MaintainUserProfile(userId string, embeddingClient Embedd
 			continue
 		}
 
-		if err := s.ArchiveFact(userId, fact.Text, embedding); err != nil {
+		if err := s.ArchiveFact(userID, fact.Text, embedding); err != nil {
 			log.Printf("Error archiving fact '%s': %v", fact.Text, err)
 			continue
 		}
 
 		archivedCount++
-		log.Printf("Archived fact for user %s: %s (age: %d days)", userId, fact.Text, (time.Now().Unix()-fact.CreatedAt)/(60*60*24))
+		log.Printf("Archived fact for user %s: %s (age: %d days)", userID, fact.Text, (time.Now().Unix()-fact.CreatedAt)/(60*60*24))
 	}
 
 	// Check if summarization is needed
 	if len(currentFacts) > summarizationThreshold {
-		log.Printf("User %s has %d facts, triggering summarization (threshold: %d)", userId, len(currentFacts), summarizationThreshold)
+		log.Printf("User %s has %d facts, triggering summarization (threshold: %d)", userID, len(currentFacts), summarizationThreshold)
 
-		summarizedFacts, err := s.SummarizeFacts(userId, cerebrasClient)
+		summarizedFacts, err := s.SummarizeFacts(userID, cerebrasClient)
 		if err != nil {
 			return archivedCount, false, fmt.Errorf("failed to summarize facts: %w", err)
 		}
@@ -206,7 +206,7 @@ func (s *SurrealStore) MaintainUserProfile(userId string, embeddingClient Embedd
 		// Replace all facts with summarized version
 		// First, clear existing facts
 		_, err = s.client.Query(`UPDATE type::thing("user_profiles", $user_id) SET facts = [], last_updated = time::unix();`, map[string]interface{}{
-			"user_id": userId,
+			"user_id": userID,
 		})
 		if err != nil {
 			return archivedCount, false, fmt.Errorf("failed to clear facts for summarization: %w", err)
@@ -214,21 +214,21 @@ func (s *SurrealStore) MaintainUserProfile(userId string, embeddingClient Embedd
 
 		// Then add summarized facts with current timestamp
 		for _, factText := range summarizedFacts {
-			err = s.AddFactWithTimestamp(userId, factText, time.Now().Unix())
+			err = s.AddFactWithTimestamp(userID, factText, time.Now().Unix())
 			if err != nil {
 				log.Printf("Error adding summarized fact '%s': %v", factText, err)
 			}
 		}
 
 		summarized = true
-		log.Printf("Summarized %d facts into %d facts for user %s", len(currentFacts), len(summarizedFacts), userId)
+		log.Printf("Summarized %d facts into %d facts for user %s", len(currentFacts), len(summarizedFacts), userID)
 	}
 
 	return archivedCount, summarized, nil
 }
 
 // AddFactWithTimestamp adds a single fact with a specific timestamp
-func (s *SurrealStore) AddFactWithTimestamp(userId, factText string, timestamp int64) error {
+func (s *SurrealStore) AddFactWithTimestamp(userID, factText string, timestamp int64) error {
 	query := `
 		-- Ensure record exists
 		INSERT INTO user_profiles (id, user_id, facts, last_updated) 
@@ -242,7 +242,7 @@ func (s *SurrealStore) AddFactWithTimestamp(userId, factText string, timestamp i
 	`
 
 	_, err := s.client.Query(query, map[string]interface{}{
-		"user_id":   userId,
+		"user_id":   userID,
 		"fact_text": factText,
 		"timestamp": timestamp,
 	})

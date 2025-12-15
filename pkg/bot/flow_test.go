@@ -40,15 +40,15 @@ func (m *mockEmbeddingClient) Embed(text string) ([]float32, error) {
 
 // Mock Memory Store
 type mockMemoryStore struct {
-	AddFunc                     func(userId string, text string, vector []float32) error
-	SearchFunc                  func(userId string, queryVector []float32, limit int) ([]string, error)
-	AddRecentMessageFunc        func(userId, role, message string) error
-	GetRecentMessagesFunc       func(userId string) ([]memory.RecentMessageItem, error)
-	ClearRecentMessagesFunc     func(userId string) error
-	DeleteUserDataFunc          func(userId string) error
-	GetFactsFunc                func(userId string) ([]string, error)
-	ApplyDeltaFunc              func(userId string, adds []string, removes []string) error
-	DeleteFactsFunc             func(userId string) error
+	AddFunc                     func(userID string, text string, vector []float32) error
+	SearchFunc                  func(userID string, queryVector []float32, limit int) ([]string, error)
+	AddRecentMessageFunc        func(userID, role, message string) error
+	GetRecentMessagesFunc       func(userID string) ([]memory.RecentMessageItem, error)
+	ClearRecentMessagesFunc     func(userID string) error
+	DeleteUserDataFunc          func(userID string) error
+	GetFactsFunc                func(userID string) ([]string, error)
+	ApplyDeltaFunc              func(userID string, adds []string, removes []string) error
+	DeleteFactsFunc             func(userID string) error
 	GetCachedEmojisFunc         func(guildID string) ([]string, error)
 	SetCachedEmojisFunc         func(guildID string, emojis []string) error
 	GetCachedClassificationFunc func(text string, model string) (string, float64, error)
@@ -58,65 +58,65 @@ type mockMemoryStore struct {
 	SetAffectionFunc            func(userID string, amount int) error
 }
 
-func (m *mockMemoryStore) Add(userId string, text string, vector []float32) error {
+func (m *mockMemoryStore) Add(userID string, text string, vector []float32) error {
 	if m.AddFunc != nil {
-		return m.AddFunc(userId, text, vector)
+		return m.AddFunc(userID, text, vector)
 	}
 	return nil
 }
 
-func (m *mockMemoryStore) DeleteFacts(userId string) error {
+func (m *mockMemoryStore) DeleteFacts(userID string) error {
 	if m.DeleteFactsFunc != nil {
-		return m.DeleteFactsFunc(userId)
+		return m.DeleteFactsFunc(userID)
 	}
 	return nil
 }
 
-func (m *mockMemoryStore) Search(userId string, queryVector []float32, limit int) ([]string, error) {
+func (m *mockMemoryStore) Search(userID string, queryVector []float32, limit int) ([]string, error) {
 	if m.SearchFunc != nil {
-		return m.SearchFunc(userId, queryVector, limit)
+		return m.SearchFunc(userID, queryVector, limit)
 	}
 	return []string{"retrieved memory 1", "retrieved memory 2"}, nil
 }
 
-func (m *mockMemoryStore) AddRecentMessage(userId, role, message string) error {
+func (m *mockMemoryStore) AddRecentMessage(userID, role, message string) error {
 	if m.AddRecentMessageFunc != nil {
-		return m.AddRecentMessageFunc(userId, role, message)
+		return m.AddRecentMessageFunc(userID, role, message)
 	}
 	return nil
 }
 
-func (m *mockMemoryStore) GetRecentMessages(userId string) ([]memory.RecentMessageItem, error) {
+func (m *mockMemoryStore) GetRecentMessages(userID string) ([]memory.RecentMessageItem, error) {
 	if m.GetRecentMessagesFunc != nil {
-		return m.GetRecentMessagesFunc(userId)
+		return m.GetRecentMessagesFunc(userID)
 	}
 	return []memory.RecentMessageItem{{Role: "user", Text: "recent message 1"}, {Role: "assistant", Text: "recent message 2"}}, nil
 }
 
-func (m *mockMemoryStore) ClearRecentMessages(userId string) error {
+func (m *mockMemoryStore) ClearRecentMessages(userID string) error {
 	if m.ClearRecentMessagesFunc != nil {
-		return m.ClearRecentMessagesFunc(userId)
+		return m.ClearRecentMessagesFunc(userID)
 	}
 	return nil
 }
 
-func (m *mockMemoryStore) DeleteUserData(userId string) error {
+func (m *mockMemoryStore) DeleteUserData(userID string) error {
 	if m.DeleteUserDataFunc != nil {
-		return m.DeleteUserDataFunc(userId)
+		return m.DeleteUserDataFunc(userID)
 	}
 	return nil
 }
 
-func (m *mockMemoryStore) GetFacts(userId string) ([]string, error) {
+func (m *mockMemoryStore) GetFacts(userID string) ([]string, error) {
 	if m.GetFactsFunc != nil {
-		return m.GetFactsFunc(userId)
+		return m.GetFactsFunc(userID)
 	}
 	return []string{}, nil
 }
 
-func (m *mockMemoryStore) ApplyDelta(userId string, adds []string, removes []string) error {
+func (m *mockMemoryStore) ApplyDelta(userID string, adds []string, removes []string) error {
 	if m.ApplyDeltaFunc != nil {
-		return m.ApplyDeltaFunc(userId, adds, removes)
+		return m.ApplyDeltaFunc(userID, adds, removes)
 	}
 	return nil
 }
@@ -157,7 +157,7 @@ func (m *mockMemoryStore) EnsureUser(userID string) error {
 	return nil
 }
 
-func (m *mockMemoryStore) AddReminder(userId string, text string, dueAt int64) error {
+func (m *mockMemoryStore) AddReminder(userID string, text string, dueAt int64) error {
 	return nil
 }
 
@@ -333,12 +333,12 @@ func TestMessageFlow(t *testing.T) {
 	var addedFacts []string
 	var finalPrompt string
 
-	mockMemory.SearchFunc = func(userId string, queryVector []float32, limit int) ([]string, error) {
+	mockMemory.SearchFunc = func(userID string, queryVector []float32, limit int) ([]string, error) {
 		searchCalled = true
 		return []string{"retrieved memory"}, nil
 	}
 
-	mockMemory.GetRecentMessagesFunc = func(userId string) ([]memory.RecentMessageItem, error) {
+	mockMemory.GetRecentMessagesFunc = func(userID string) ([]memory.RecentMessageItem, error) {
 		getRecentMessagesCalled = true
 		return []memory.RecentMessageItem{{Role: "user", Text: "rolling context"}}, nil
 	}
@@ -394,12 +394,12 @@ func TestMessageFlow(t *testing.T) {
 		return "This is a standard response.", nil
 	}
 
-	mockMemory.AddRecentMessageFunc = func(userId, role, message string) error {
+	mockMemory.AddRecentMessageFunc = func(userID, role, message string) error {
 		addRecentMessageCalls++
 		return nil
 	}
 
-	mockMemory.ApplyDeltaFunc = func(userId string, adds []string, removes []string) error {
+	mockMemory.ApplyDeltaFunc = func(userID string, adds []string, removes []string) error {
 		applyDeltaCalled = true
 		addedFacts = adds
 		return nil
