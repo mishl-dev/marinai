@@ -50,6 +50,8 @@ type MessageContext struct {
 	Facts          []string
 	EmojiText      string
 	ImageContext   string
+	ComebackContext string // Set when user returns after boredom DMs
+	TimeContext     string // Current time/date/season awareness
 }
 
 func NewHandler(c CerebrasClient, e EmbeddingClient, g GeminiClient, m memory.Store, messageProcessingDelay float64, factAgingDays int, factSummarizationThreshold int, maintenanceIntervalHours float64) *Handler {
@@ -372,10 +374,24 @@ func (h *Handler) buildConversationMessages(displayName, userContent string, ctx
 	moodInstruction := GetMoodInstruction(mood)
 	statePrompt := h.GetStateForPrompt() // Marin's current internal state
 
+	// Build the full system prompt with time awareness
 	systemPrompt := fmt.Sprintf("%s\n\n%s\n\n%s", fmt.Sprintf(SystemPrompt, displayName, profileText), moodInstruction, statePrompt)
+	
+	// Add time context if available
+	if ctx.TimeContext != "" {
+		systemPrompt = ctx.TimeContext + "\n\n" + systemPrompt
+	}
+
 	messages := []cerebras.Message{
 		{Role: "system", Content: systemPrompt},
 	}
+
+	// Add comeback context if user is returning after boredom DMs
+	if ctx.ComebackContext != "" {
+		messages = append(messages, cerebras.Message{Role: "system", Content: ctx.ComebackContext})
+		log.Printf("Comeback context: %s", ctx.ComebackContext)
+	}
+
 	log.Printf("Retrieved memories: %s", retrievedMemories)
 	if retrievedMemories != "" {
 		messages = append(messages, cerebras.Message{Role: "system", Content: retrievedMemories})
@@ -408,7 +424,7 @@ func (h *Handler) buildConversationMessages(displayName, userContent string, ctx
 func (h *Handler) gatherMessageContext(s Session, userID, content string, channel *discordgo.Channel, attachments []*discordgo.MessageAttachment) MessageContext {
 	var ctx MessageContext
 	var wg sync.WaitGroup
-	wg.Add(5)
+	wg.Add(7) // Increased from 5 to 7 for new context types
 
 	// 1. Recent Context
 	go func() {
@@ -459,6 +475,82 @@ func (h *Handler) gatherMessageContext(s Session, userID, content string, channe
 	go func() {
 		defer wg.Done()
 		ctx.ImageContext = h.processImageAttachments(attachments)
+	}()
+
+	// 6. Comeback Context - check if user is returning after boredom DMs
+	go func() {
+		defer wg.Done()
+		_, dmCount, hasPending, err := h.memoryStore.GetPendingDMInfo(userID)
+		if err == nil && hasPending && dmCount > 0 {
+			// User is responding after we sent them boredom DMs!
+			switch dmCount {
+			case 1:
+				ctx.ComebackContext = "COMEBACK: This person is replying after you DMed them once. Be happy they responded!"
+			case 2:
+				ctx.ComebackContext = "COMEBACK: This person is replying after you DMed them TWICE. Tease them gently about finally responding."
+			case 3:
+				ctx.ComebackContext = "COMEBACK: This person is replying after you DMed them THREE times! Be dramatic about how long it took them to respond."
+			case 4:
+				ctx.ComebackContext = "COMEBACK: This person is replying after you DMed them FOUR times! You were about to give up on them. Be relieved/happy but also give them a hard time about it."
+			}
+		}
+	}()
+
+	// 7. Time Context - current date/time awareness
+	go func() {
+		defer wg.Done()
+		// Tokyo time for Marin
+		loc := time.FixedZone("Asia/Tokyo", 9*60*60)
+		now := time.Now().In(loc)
+		
+		// Get time of day
+		hour := now.Hour()
+		var timeOfDay string
+		switch {
+		case hour >= 5 && hour < 12:
+			timeOfDay = "morning"
+		case hour >= 12 && hour < 17:
+			timeOfDay = "afternoon"
+		case hour >= 17 && hour < 21:
+			timeOfDay = "evening"
+		default:
+			timeOfDay = "night"
+		}
+		
+		// Get season (Northern Hemisphere / Japan)
+		month := now.Month()
+		var season string
+		switch {
+		case month >= 3 && month <= 5:
+			season = "spring"
+		case month >= 6 && month <= 8:
+			season = "summer"
+		case month >= 9 && month <= 11:
+			season = "autumn"
+		default:
+			season = "winter"
+		}
+		
+		// Check for special days/holidays
+		var specialDay string
+		day := now.Day()
+		switch {
+		case month == 12 && day >= 20 && day <= 26:
+			specialDay = " (Christmas season!)"
+		case month == 12 && day == 31:
+			specialDay = " (New Year's Eve!)"
+		case month == 1 && day == 1:
+			specialDay = " (New Year's Day!)"
+		case month == 2 && day == 14:
+			specialDay = " (Valentine's Day!)"
+		case month == 3 && day == 14:
+			specialDay = " (White Day!)"
+		case month == 10 && day == 31:
+			specialDay = " (Halloween!)"
+		}
+		
+		ctx.TimeContext = fmt.Sprintf("[Current Time: %s, %s %d - %s, %s%s]",
+			timeOfDay, now.Month().String(), day, now.Weekday().String(), season, specialDay)
 	}()
 
 	wg.Wait()
