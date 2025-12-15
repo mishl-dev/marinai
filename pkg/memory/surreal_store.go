@@ -461,6 +461,11 @@ func (s *SurrealStore) DeleteReminder(id string) error {
 		parts := strings.SplitN(id, ":", 2)
 		tb = parts[0]
 		key = parts[1]
+
+		// Security: Ensure we are only deleting from the reminders table
+		if tb != "reminders" {
+			return fmt.Errorf("security error: attempting to delete from invalid table '%s' via DeleteReminder", tb)
+		}
 	} else {
 		tb = "reminders"
 		key = id
