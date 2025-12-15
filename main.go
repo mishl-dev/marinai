@@ -7,9 +7,9 @@ import (
 
 	"marinai/pkg/config"
 	"marinai/pkg/embedding"
+	"marinai/pkg/gemini"
 	"marinai/pkg/memory"
 	"marinai/pkg/surreal"
-	"marinai/pkg/gemini"
 	"os"
 	"os/signal"
 	"syscall"
@@ -34,7 +34,6 @@ func main() {
 	cerebrasKey := os.Getenv("CEREBRAS_API_KEY")
 	embeddingKey := os.Getenv("EMBEDDING_API_KEY")
 
-
 	// Check each required environment variable individually for better error messages
 	if token == "" {
 		log.Fatal("Missing required environment variable: DISCORD_TOKEN")
@@ -46,19 +45,15 @@ func main() {
 		log.Fatal("Missing required environment variable: EMBEDDING_API_KEY")
 	}
 
-
 	embeddingURL := os.Getenv("EMBEDDING_API_URL")
 	if embeddingURL == "" {
 		embeddingURL = "https://vector.mishl.dev/embed"
 	}
 
-
-
 	// Initialize Clients
 	cerebrasClient := cerebras.NewClient(cerebrasKey, cfg.ModelSettings.Temperature, cfg.ModelSettings.TopP, nil)
 	baseEmbeddingClient := embedding.NewClient(embeddingKey, embeddingURL)
 	embeddingClient := embedding.NewCachedClient(baseEmbeddingClient, 500) // Cache up to 500 embeddings
-
 
 	// Initialize Gemini Client - for image understanding and fast classification
 	var geminiClient bot.GeminiClient

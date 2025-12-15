@@ -46,12 +46,12 @@ const MaxAffection = 100000
 // AffectionGains defines how much affection is gained for various actions
 var AffectionGains = map[string]int{
 	// Base interaction gains
-	"message":        50,   // Any message interaction (reduced from 100)
-	"mention":        150,  // User mentions Marin directly
-	"dm":             200,  // DM conversation (more intimate)
-	"long_message":   100,  // Bonus for thoughtful long messages (50+ chars)
-	"long_convo":     400,  // Extended back-and-forth (5+ exchanges)
-	"respond_to_dm":  1000, // Responding to boredom DM (shows they care!)
+	"message":       50,   // Any message interaction (reduced from 100)
+	"mention":       150,  // User mentions Marin directly
+	"dm":            200,  // DM conversation (more intimate)
+	"long_message":  100,  // Bonus for thoughtful long messages (50+ chars)
+	"long_convo":    400,  // Extended back-and-forth (5+ exchanges)
+	"respond_to_dm": 1000, // Responding to boredom DM (shows they care!)
 
 	// Behavioral bonuses
 	"compliment":     300, // Complimenting Marin
@@ -76,15 +76,15 @@ var AffectionGains = map[string]int{
 // AffectionPenalties defines affection reduction for negative behaviors
 // These are intentionally conservative - we only penalize clearly negative behavior
 var AffectionPenalties = map[string]int{
-	"rude":               -400,  // Being mean/rude to Marin (reduced from -600)
-	"dismissive":         -100,  // Short dismissive responses ("k", "whatever") - mild
-	"ignore_question":    -75,   // Ignoring Marin's questions - mild
-	"ghosting":           -200,  // Starting convo then disappearing mid-chat
-	"insult":             -800,  // Direct insults (reduced from -1000)
-	"impatient":          -100,  // Being impatient or rushing Marin - mild
-	"passive_aggressive": -250,  // Sarcastic, backhanded comments (reduced from -350)
-	"disinterested":      -150,  // Changing subject when Marin shares something (reduced from -250)
-	"creepy":             -400,  // Being inappropriate/making Marin uncomfortable (reduced from -500)
+	"rude":               -400, // Being mean/rude to Marin (reduced from -600)
+	"dismissive":         -100, // Short dismissive responses ("k", "whatever") - mild
+	"ignore_question":    -75,  // Ignoring Marin's questions - mild
+	"ghosting":           -200, // Starting convo then disappearing mid-chat
+	"insult":             -800, // Direct insults (reduced from -1000)
+	"impatient":          -100, // Being impatient or rushing Marin - mild
+	"passive_aggressive": -250, // Sarcastic, backhanded comments (reduced from -350)
+	"disinterested":      -150, // Changing subject when Marin shares something (reduced from -250)
+	"creepy":             -400, // Being inappropriate/making Marin uncomfortable (reduced from -500)
 }
 
 // ==========================================
@@ -93,14 +93,14 @@ var AffectionPenalties = map[string]int{
 
 // MoodAffectionMultipliers - certain moods amplify gains/losses
 var MoodAffectionMultipliers = map[string]float64{
-	"HYPER":     1.2,  // Marin is excited, interactions feel more meaningful
-	"FLIRTY":    1.5,  // Flirty mood = compliments and flirting worth more
-	"SLEEPY":    0.8,  // Drowsy, less engaged
-	"BORED":     0.6,  // Bored, harder to impress
-	"NOSTALGIC": 1.1,  // Reflective, emotional connections worth more
-	"FOCUSED":   0.9,  // Task-oriented, less emotional engagement
-	"PLAYFUL":   1.3,  // Playful, teasing and jokes worth more
-	"NORMAL":    1.0,  // Default
+	"HYPER":     1.2, // Marin is excited, interactions feel more meaningful
+	"FLIRTY":    1.5, // Flirty mood = compliments and flirting worth more
+	"SLEEPY":    0.8, // Drowsy, less engaged
+	"BORED":     0.6, // Bored, harder to impress
+	"NOSTALGIC": 1.1, // Reflective, emotional connections worth more
+	"FOCUSED":   0.9, // Task-oriented, less emotional engagement
+	"PLAYFUL":   1.3, // Playful, teasing and jokes worth more
+	"NORMAL":    1.0, // Default
 }
 
 // ==========================================

@@ -16,12 +16,12 @@ import (
 
 // MarinState represents Marin's current internal state
 type MarinState struct {
-	CurrentActivity   string   `json:"current_activity"`   // What she's doing right now
-	CurrentProject    string   `json:"current_project"`    // Cosplay/project she's working on
-	ThinkingAbout     string   `json:"thinking_about"`     // What's on her mind
-	RecentMood        string   `json:"recent_mood"`        // How recent interactions made her feel
-	Goals             []string `json:"goals"`              // Things she wants to do
-	LastUpdated       int64    `json:"last_updated"`       // When state was last updated
+	CurrentActivity string   `json:"current_activity"` // What she's doing right now
+	CurrentProject  string   `json:"current_project"`  // Cosplay/project she's working on
+	ThinkingAbout   string   `json:"thinking_about"`   // What's on her mind
+	RecentMood      string   `json:"recent_mood"`      // How recent interactions made her feel
+	Goals           []string `json:"goals"`            // Things she wants to do
+	LastUpdated     int64    `json:"last_updated"`     // When state was last updated
 }
 
 // Activities Marin might be doing

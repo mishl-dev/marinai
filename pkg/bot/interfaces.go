@@ -56,8 +56,6 @@ type EmbeddingClient interface {
 	Embed(text string) ([]float32, error)
 }
 
-
-
 // GeminiClient interface for Gemini API (vision + classification)
 type GeminiClient interface {
 	DescribeImageFromURL(imageURL string) (*ImageDescription, error)

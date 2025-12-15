@@ -803,7 +803,7 @@ func (s *SurrealStore) GetAffection(userID string) (int, error) {
 	if row, ok := rows[0].(map[string]interface{}); ok {
 		// Log the raw value to debug type issues
 		// fmt.Printf("GetAffection Raw Value for %s: %v\n", userID, row["affection"])
-		
+
 		switch a := row["affection"].(type) {
 		case float64:
 			return int(a), nil

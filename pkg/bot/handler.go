@@ -106,7 +106,6 @@ func (h *Handler) SetBotID(id string) {
 	h.botID = id
 }
 
-
 func (h *Handler) ResetMemory(userID string) error {
 	if err := h.memoryStore.ClearRecentMessages(userID); err != nil {
 		log.Printf("Error clearing recent messages: %v", err)
@@ -240,7 +239,7 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 			defer h.wg.Done()
 			h.addRecentMessage(m.Author.ID, "user", m.Content)
 			h.addRecentMessage(m.Author.ID, "assistant", refusal)
-			
+
 			// Calculate affection based on full interaction (user message + Marin's response)
 			h.UpdateAffectionForInteraction(m.Author.ID, m.Content, refusal, isMentioned, isDM, false, currentMoodForAffection)
 		}()
@@ -478,7 +477,3 @@ func (h *Handler) cleanupLoop() {
 		}
 	}
 }
-
-
-
-
