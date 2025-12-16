@@ -306,7 +306,6 @@ func (c *Client) makeRequestWithKey(reqBody Request, apiKey string) (string, Usa
 	return content, apiResp.Usage, nil
 }
 
-// Classify uses llama3.1-8b (fast model) to classify text into one of the provided labels
 // Returns the best matching label and a confidence score (0.0-1.0)
 func (c *Client) Classify(text string, labels []string) (string, float64, error) {
 	// Build the labels list for the prompt
@@ -331,9 +330,8 @@ Output ONLY valid JSON. Example: {"label": "neutral", "confidence": 0.85}`, labe
 		{Role: "user", Content: prompt},
 	}
 
-	// Use llama3.1-8b specifically for classification (fast and sufficient)
 	reqBody := Request{
-		Model:       "llama3.1-8b",
+		Model:       "llama-3.3-70b",
 		Stream:      false,
 		MaxTokens:   100, // Classification only needs short output
 		Temperature: 0.1, // Low temperature for consistent classification
