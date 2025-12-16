@@ -42,6 +42,17 @@ type Reminder struct {
 	CreatedAt int64  `json:"created_at"`
 }
 
+// DelayedThought represents a thought Marin will send later (conversation continuation)
+type DelayedThought struct {
+	ID             string `json:"id,omitempty"`
+	UserID         string `json:"user_id"`
+	ConvoSummary   string `json:"convo_summary"`
+	LastUserMsg    string `json:"last_user_msg"`
+	LastMarinReply string `json:"last_marin_reply"`
+	ScheduledAt    int64  `json:"scheduled_at"`
+	CreatedAt      int64  `json:"created_at"`
+}
+
 type Store interface {
 	Add(userID string, text string, vector []float32) error
 	Search(userID string, queryVector []float32, limit int) ([]string, error)
@@ -94,6 +105,12 @@ type Store interface {
 	UpdateStreak(userID string) (int, bool) // Returns (new streak, broke streak)
 	GetFirstInteraction(userID string) (time.Time, error)
 	SetFirstInteraction(userID string, timestamp time.Time) error
+
+	// Delayed Thoughts (Conversation Continuation)
+	AddDelayedThought(thought DelayedThought) error
+	GetDueDelayedThoughts() ([]DelayedThought, error)
+	HasDelayedThought(userID string) (bool, error)
+	DeleteDelayedThought(id string) error
 }
 
 type FileStore struct {
@@ -435,5 +452,23 @@ func (vs *FileStore) GetFirstInteraction(userID string) (time.Time, error) {
 }
 
 func (vs *FileStore) SetFirstInteraction(userID string, timestamp time.Time) error {
+	return nil
+}
+
+// Delayed Thoughts (FileStore stubs)
+
+func (vs *FileStore) AddDelayedThought(thought DelayedThought) error {
+	return nil
+}
+
+func (vs *FileStore) GetDueDelayedThoughts() ([]DelayedThought, error) {
+	return []DelayedThought{}, nil
+}
+
+func (vs *FileStore) HasDelayedThought(userID string) (bool, error) {
+	return false, nil
+}
+
+func (vs *FileStore) DeleteDelayedThought(id string) error {
 	return nil
 }

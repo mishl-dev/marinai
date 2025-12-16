@@ -258,6 +258,24 @@ func (m *mockMemoryStore) SetFirstInteraction(userID string, timestamp time.Time
 	return nil
 }
 
+// Delayed Thoughts (mock implementations)
+
+func (m *mockMemoryStore) AddDelayedThought(thought memory.DelayedThought) error {
+	return nil
+}
+
+func (m *mockMemoryStore) GetDueDelayedThoughts() ([]memory.DelayedThought, error) {
+	return []memory.DelayedThought{}, nil
+}
+
+func (m *mockMemoryStore) HasDelayedThought(userID string) (bool, error) {
+	return false, nil
+}
+
+func (m *mockMemoryStore) DeleteDelayedThought(id string) error {
+	return nil
+}
+
 // Mock Discord Session
 type mockDiscordSession struct {
 	ChannelMessageSendFunc        func(channelID string, content string, options ...discordgo.RequestOption) (*discordgo.Message, error)

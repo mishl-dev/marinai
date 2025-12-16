@@ -87,6 +87,7 @@ func NewHandler(c CerebrasClient, e EmbeddingClient, g GeminiClient, m memory.St
 	go h.cleanupLoop()
 	go h.runAffectionDecayLoop()
 	go h.runProactiveThoughtsLoop() // Agency: proactive thoughts to close friends
+	go h.runContinuationLoop()      // Conversation continuation: come back later with new thoughts
 
 	return h
 }
@@ -296,6 +297,9 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 				}
 			}
 		}
+
+		// Maybe queue a continuation thought for later (makes Marin feel more real)
+		h.QueueContinuation(m.Author.ID, m.Content, reply)
 	}()
 }
 

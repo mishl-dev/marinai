@@ -100,6 +100,17 @@ func (s *SurrealStore) Init() error {
 		"DEFINE FIELD IF NOT EXISTS user_id ON pending_dm TYPE string",
 		"DEFINE FIELD IF NOT EXISTS sent_at ON pending_dm TYPE int",
 		"DEFINE FIELD IF NOT EXISTS dm_count ON pending_dm TYPE int DEFAULT 1",
+
+		// -- Delayed Thoughts (Conversation Continuation) --
+		"DEFINE TABLE IF NOT EXISTS delayed_thoughts SCHEMAFULL",
+		"DEFINE FIELD IF NOT EXISTS user_id ON delayed_thoughts TYPE string",
+		"DEFINE FIELD IF NOT EXISTS convo_summary ON delayed_thoughts TYPE string",
+		"DEFINE FIELD IF NOT EXISTS last_user_msg ON delayed_thoughts TYPE string",
+		"DEFINE FIELD IF NOT EXISTS last_marin_reply ON delayed_thoughts TYPE string",
+		"DEFINE FIELD IF NOT EXISTS scheduled_at ON delayed_thoughts TYPE int",
+		"DEFINE FIELD IF NOT EXISTS created_at ON delayed_thoughts TYPE int",
+		"DEFINE INDEX IF NOT EXISTS user_id_idx ON delayed_thoughts FIELDS user_id",
+		"DEFINE INDEX IF NOT EXISTS scheduled_at_idx ON delayed_thoughts FIELDS scheduled_at",
 	}
 
 	for _, q := range schemaQueries {
@@ -1115,6 +1126,130 @@ func (s *SurrealStore) SetFirstInteraction(userID string, timestamp time.Time) e
 	_, err := s.client.Query(query, map[string]interface{}{
 		"user_id":   userID,
 		"timestamp": timestamp.Unix(),
+	})
+	return err
+}
+
+// ==========================================
+// DELAYED THOUGHTS (Conversation Continuation)
+// ==========================================
+
+// AddDelayedThought adds a thought to be sent later
+func (s *SurrealStore) AddDelayedThought(thought DelayedThought) error {
+	item := map[string]interface{}{
+		"user_id":          thought.UserID,
+		"convo_summary":    thought.ConvoSummary,
+		"last_user_msg":    thought.LastUserMsg,
+		"last_marin_reply": thought.LastMarinReply,
+		"scheduled_at":     thought.ScheduledAt,
+		"created_at":       thought.CreatedAt,
+	}
+
+	_, err := s.client.Create("delayed_thoughts", item)
+	return err
+}
+
+// GetDueDelayedThoughts returns all thoughts that are due to be sent
+func (s *SurrealStore) GetDueDelayedThoughts() ([]DelayedThought, error) {
+	query := `SELECT * FROM delayed_thoughts WHERE scheduled_at <= $now;`
+	result, err := s.client.Query(query, map[string]interface{}{
+		"now": time.Now().Unix(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	rows, ok := result.([]interface{})
+	if !ok {
+		return []DelayedThought{}, nil
+	}
+
+	thoughts := make([]DelayedThought, 0, len(rows))
+	for _, row := range rows {
+		if rowMap, ok := row.(map[string]interface{}); ok {
+			t := DelayedThought{}
+
+			// Parse ID
+			if id, ok := rowMap["id"].(string); ok {
+				t.ID = id
+			} else {
+				// Handle struct/map ID formats
+				t.ID = fmt.Sprintf("%v", rowMap["id"])
+			}
+
+			if uid, ok := rowMap["user_id"].(string); ok {
+				t.UserID = uid
+			}
+			if cs, ok := rowMap["convo_summary"].(string); ok {
+				t.ConvoSummary = cs
+			}
+			if lum, ok := rowMap["last_user_msg"].(string); ok {
+				t.LastUserMsg = lum
+			}
+			if lmr, ok := rowMap["last_marin_reply"].(string); ok {
+				t.LastMarinReply = lmr
+			}
+
+			// Parse scheduled_at
+			switch v := rowMap["scheduled_at"].(type) {
+			case float64:
+				t.ScheduledAt = int64(v)
+			case int64:
+				t.ScheduledAt = v
+			case int:
+				t.ScheduledAt = int64(v)
+			}
+
+			// Parse created_at
+			switch v := rowMap["created_at"].(type) {
+			case float64:
+				t.CreatedAt = int64(v)
+			case int64:
+				t.CreatedAt = v
+			case int:
+				t.CreatedAt = int64(v)
+			}
+
+			thoughts = append(thoughts, t)
+		}
+	}
+
+	return thoughts, nil
+}
+
+// HasDelayedThought checks if a user already has a pending delayed thought
+func (s *SurrealStore) HasDelayedThought(userID string) (bool, error) {
+	query := `SELECT * FROM delayed_thoughts WHERE user_id = $user_id LIMIT 1;`
+	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
+	if err != nil {
+		return false, err
+	}
+
+	rows, ok := result.([]interface{})
+	if !ok || len(rows) == 0 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// DeleteDelayedThought removes a thought after it's been sent
+func (s *SurrealStore) DeleteDelayedThought(id string) error {
+	// Handle id that might be "delayed_thoughts:uuid" or just "uuid"
+	var tb, key string
+	if strings.Contains(id, ":") {
+		parts := strings.SplitN(id, ":", 2)
+		tb = parts[0]
+		key = parts[1]
+	} else {
+		tb = "delayed_thoughts"
+		key = id
+	}
+
+	query := `DELETE type::thing($tb, $key);`
+	_, err := s.client.Query(query, map[string]interface{}{
+		"tb":  tb,
+		"key": key,
 	})
 	return err
 }
