@@ -156,7 +156,11 @@ If there's text in the image, mention what it says.`
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gemini API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+		bodyStr := string(bodyBytes)
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200] + "...(truncated)"
+		}
+		return nil, fmt.Errorf("gemini API error (status %d): %s", resp.StatusCode, bodyStr)
 	}
 
 	var geminiResp geminiResponse
@@ -303,7 +307,11 @@ Output ONLY valid JSON. Example: {"label": "neutral", "confidence": 0.85}`, labe
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", 0, fmt.Errorf("gemini API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+		bodyStr := string(bodyBytes)
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200] + "...(truncated)"
+		}
+		return "", 0, fmt.Errorf("gemini API error (status %d): %s", resp.StatusCode, bodyStr)
 	}
 
 	var geminiResp geminiResponse

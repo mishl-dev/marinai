@@ -50,7 +50,11 @@ func (c *Client) Embed(text string) ([]float32, error) {
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("api returned error status: %d, body: %s", resp.StatusCode, string(bodyBytes))
+		bodyStr := string(bodyBytes)
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200] + "...(truncated)"
+		}
+		return nil, fmt.Errorf("api returned error status: %d, body: %s", resp.StatusCode, bodyStr)
 	}
 
 	var apiResp struct {

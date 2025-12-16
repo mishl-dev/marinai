@@ -89,7 +89,11 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("api status %d: %s", e.StatusCode, e.Body)
+	body := e.Body
+	if len(body) > 200 {
+		body = body[:200] + "...(truncated)"
+	}
+	return fmt.Sprintf("api status %d: %s", e.StatusCode, body)
 }
 
 // NewClient creates a client with support for multiple API keys (comma-separated)
