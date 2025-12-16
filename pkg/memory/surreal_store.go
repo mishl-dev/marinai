@@ -56,6 +56,7 @@ func (s *SurrealStore) Init() error {
 		"DEFINE FIELD IF NOT EXISTS timestamp ON memories TYPE int",
 		"DEFINE FIELD IF NOT EXISTS vector ON memories TYPE array<float> ASSERT array::len($value) == 2048",
 		"DEFINE INDEX IF NOT EXISTS vector_idx ON memories FIELDS vector MTREE DIMENSION 2048 DIST COSINE",
+		"DEFINE INDEX IF NOT EXISTS user_id_idx ON memories FIELDS user_id",
 
 		// -- User Profiles --
 		"DEFINE FIELD IF NOT EXISTS user_id ON user_profiles TYPE string",
@@ -69,6 +70,7 @@ func (s *SurrealStore) Init() error {
 		"DEFINE FIELD IF NOT EXISTS affection ON user_profiles TYPE int DEFAULT 0",
 		"DEFINE FIELD IF NOT EXISTS streak ON user_profiles TYPE int DEFAULT 0",
 		"DEFINE FIELD IF NOT EXISTS last_streak_date ON user_profiles TYPE string DEFAULT ''",
+		"DEFINE INDEX IF NOT EXISTS user_id_idx ON user_profiles FIELDS user_id",
 
 		// -- Guild Cache --
 		"DEFINE FIELD IF NOT EXISTS emojis ON guild_cache TYPE array<string>",
@@ -79,12 +81,16 @@ func (s *SurrealStore) Init() error {
 		"DEFINE FIELD IF NOT EXISTS role ON recent_messages TYPE string",
 		"DEFINE FIELD IF NOT EXISTS text ON recent_messages TYPE string",
 		"DEFINE FIELD IF NOT EXISTS timestamp ON recent_messages TYPE int",
+		"DEFINE INDEX IF NOT EXISTS user_id_idx ON recent_messages FIELDS user_id",
+		"DEFINE INDEX IF NOT EXISTS user_timestamp_idx ON recent_messages FIELDS user_id, timestamp",
 
 		// -- Reminders --
 		"DEFINE FIELD IF NOT EXISTS user_id ON reminders TYPE string",
 		"DEFINE FIELD IF NOT EXISTS text ON reminders TYPE string",
 		"DEFINE FIELD IF NOT EXISTS due_at ON reminders TYPE int",
 		"DEFINE FIELD IF NOT EXISTS created_at ON reminders TYPE int",
+		"DEFINE INDEX IF NOT EXISTS user_id_idx ON reminders FIELDS user_id",
+		"DEFINE INDEX IF NOT EXISTS due_at_idx ON reminders FIELDS due_at",
 
 		// -- Bot State --
 		"DEFINE FIELD IF NOT EXISTS value ON bot_state TYPE string",
