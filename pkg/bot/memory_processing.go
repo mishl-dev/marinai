@@ -61,6 +61,16 @@ func (h *Handler) extractMemories(userID string, userName string, userMessage st
 	currentTimeStr := now.Format("Monday, 2006-01-02 15:04 UTC")
 
 	// User Prompt: Focuses on extracting useful personal information
+	// What to ignore - expanded to prevent self-learning
+	exclusionList := `
+- Temporary states: "I'm hungry", "I'm tired", "I'm busy right now"
+- Single-use preferences: "I like that joke", "that's funny"
+- Questions they asked
+- Generic greetings
+- Facts about Marin, the AI, or the character she is roleplaying
+- Information that is clearly already known (see Current Profile)`
+
+	// User Prompt: Focuses on extracting useful personal information
 	extractionPrompt := fmt.Sprintf(`Current Profile:
 %s
 
@@ -81,10 +91,7 @@ WHAT TO SAVE (add to "add" list):
 - Life events: graduations, new jobs, moves, major purchases
 
 WHAT NOT TO SAVE:
-- Temporary states: "I'm hungry", "I'm tired", "I'm busy right now"
-- Single-use preferences: "I like that joke", "that's funny"
-- Questions they asked
-- Generic greetings
+%s
 
 CONTRADICTIONS:
 If the user says something that contradicts an existing fact (e.g., they moved to a new city), add the new fact to "add" AND the old conflicting fact to "remove".
@@ -92,15 +99,15 @@ If the user says something that contradicts an existing fact (e.g., they moved t
 REMINDERS:
 If they mention a specific future event with a timeframe, create a reminder with "delay_seconds" (seconds until event) and "text" (event description).
 
-Output ONLY valid JSON. Example: {"add": ["Lives in Tokyo"], "remove": [], "reminders": []}`, currentProfile, currentTimeStr, userName, userMessage, botReply)
+Output ONLY valid JSON. Example: {"add": ["Lives in Tokyo"], "remove": [], "reminders": []}`, currentProfile, currentTimeStr, userName, userMessage, botReply, exclusionList)
 
 	messages := []cerebras.Message{
 		{
 			Role: "system",
-			Content: `You are a helpful assistant that extracts personal facts from conversations.
-Your job is to identify and save important information about the user that would be useful to remember for future conversations.
-Be thorough - if someone shares personal information, save it.
-Output ONLY valid JSON with "add", "remove", and "reminders" arrays.`,
+			Content: fmt.Sprintf(`You are a helpful assistant that extracts personal facts about the USER from conversations.
+Your job is to identify and save important information about the USER (%s) that would be useful to remember.
+CRITICAL: Extract facts ONLY about %s. DO NOT extract facts about Marin or the AI.
+Output ONLY valid JSON with "add", "remove", and "reminders" arrays.`, userName, userName),
 		},
 		{
 			Role:    "user",
