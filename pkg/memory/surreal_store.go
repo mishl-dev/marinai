@@ -40,7 +40,7 @@ func NewSurrealStore(client *surreal.Client) *SurrealStore {
 }
 
 func (s *SurrealStore) Init() error {
-	queries := []string{
+	schemaQueries := []string{
 		// -- Tables --
 		"DEFINE TABLE IF NOT EXISTS memories SCHEMAFULL",
 		"DEFINE TABLE IF NOT EXISTS user_profiles SCHEMAFULL",
@@ -94,8 +94,18 @@ func (s *SurrealStore) Init() error {
 		"DEFINE FIELD IF NOT EXISTS user_id ON pending_dm TYPE string",
 		"DEFINE FIELD IF NOT EXISTS sent_at ON pending_dm TYPE int",
 		"DEFINE FIELD IF NOT EXISTS dm_count ON pending_dm TYPE int DEFAULT 1",
+	}
 
-		// -- Migrations --
+	for _, q := range schemaQueries {
+		if _, err := s.client.Query(q, map[string]interface{}{}); err != nil {
+			// Log warning but continue, as "already exists" is a common harmless error here
+			// fmt.Printf("Init Warning: %v (Query: %s)\n", err, q)
+		}
+	}
+
+	// -- Migrations --
+	// Run these separately and log output to ensure they work
+	migrationQueries := []string{
 		"UPDATE user_profiles SET last_interaction = 0 WHERE last_interaction IS NONE",
 		"UPDATE user_profiles SET first_interaction = 0 WHERE first_interaction IS NONE",
 		"UPDATE user_profiles SET affection = 0 WHERE affection IS NONE",
@@ -103,12 +113,16 @@ func (s *SurrealStore) Init() error {
 		"UPDATE user_profiles SET last_streak_date = '' WHERE last_streak_date IS NONE",
 	}
 
-	for _, q := range queries {
-		if _, err := s.client.Query(q, map[string]interface{}{}); err != nil {
-			// Log warning but continue, as "already exists" is a common harmless error here
-			// fmt.Printf("Init Warning: %v (Query: %s)\n", err, q)
+	for _, q := range migrationQueries {
+		_, err := s.client.Query(q, map[string]interface{}{})
+		if err != nil {
+			log.Printf("[ERROR] Migration failed: %v (Query: %s)", err, q)
+		} else {
+			// Optional: log success if useful, filtering out trivial noise
+			// log.Printf("[INFO] Migration executed: %s", q)
 		}
 	}
+
 	return nil
 }
 
