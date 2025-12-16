@@ -105,22 +105,28 @@ func (s *SurrealStore) Init() error {
 
 	// -- Migrations --
 	// Run these separately and log output to ensure they work
-	migrationQueries := []string{
-		"UPDATE user_profiles SET last_interaction = 0 WHERE last_interaction IS NONE",
-		"UPDATE user_profiles SET first_interaction = 0 WHERE first_interaction IS NONE",
-		"UPDATE user_profiles SET affection = 0 WHERE affection IS NONE",
-		"UPDATE user_profiles SET streak = 0 WHERE streak IS NONE",
-		"UPDATE user_profiles SET last_streak_date = '' WHERE last_streak_date IS NONE",
-	}
+	// We use a single combined query with the coalescing operator (??) to ensure that 
+	// when we touch a record, we fix ALL invalid fields at once. 
+	// Otherwise, fixing just one field will fail because the other existing NONE fields violate the schema.
+	migrationQuery := `
+		UPDATE user_profiles SET 
+			last_interaction = last_interaction ?? 0,
+			first_interaction = first_interaction ?? 0,
+			affection = affection ?? 0,
+			streak = streak ?? 0,
+			last_streak_date = last_streak_date ?? ''
+		WHERE 
+			last_interaction IS NONE OR 
+			first_interaction IS NONE OR 
+			affection IS NONE OR 
+			streak IS NONE OR 
+			last_streak_date IS NONE;
+	`
 
-	for _, q := range migrationQueries {
-		_, err := s.client.Query(q, map[string]interface{}{})
-		if err != nil {
-			log.Printf("[ERROR] Migration failed: %v (Query: %s)", err, q)
-		} else {
-			// Optional: log success if useful, filtering out trivial noise
-			// log.Printf("[INFO] Migration executed: %s", q)
-		}
+	if _, err := s.client.Query(migrationQuery, map[string]interface{}{}); err != nil {
+		log.Printf("[ERROR] Migration failed: %v (Query: %s)", err, migrationQuery)
+	} else {
+		// log.Printf("[INFO] Migration executed successfully")
 	}
 
 	return nil
@@ -455,11 +461,23 @@ func (s *SurrealStore) GetDueReminders() ([]Reminder, error) {
 }
 
 func (s *SurrealStore) UpdateReminder(reminder Reminder) error {
+	// Parse ID to ensure it's treated as a Record ID, not a string
+	var tb, key string
+	if strings.Contains(reminder.ID, ":") {
+		parts := strings.SplitN(reminder.ID, ":", 2)
+		tb = parts[0]
+		key = parts[1]
+	} else {
+		tb = "reminders"
+		key = reminder.ID
+	}
+
 	query := `
-		UPDATE $id SET text = $text, due_at = $due_at, user_id = $user_id;
+		UPDATE type::thing($tb, $key) SET text = $text, due_at = $due_at, user_id = $user_id;
 	`
 	_, err := s.client.Query(query, map[string]interface{}{
-		"id":      reminder.ID,
+		"tb":      tb,
+		"key":     key,
 		"text":    reminder.Text,
 		"due_at":  reminder.DueAt,
 		"user_id": reminder.UserID,
