@@ -161,8 +161,17 @@ func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 	if len(facts) == 0 {
 		embed = &discordgo.MessageEmbed{
 			Title:       fmt.Sprintf("📝 Memory File: %s", userName),
-			Description: "I don't have any specific notes about you yet! Chat with me more and I'll start remembering things~",
+			Description: "I don't have any specific notes about you yet!",
 			Color:       0x00BFFF, // Deep Sky Blue
+			Fields: []*discordgo.MessageEmbedField{
+				{
+					Name: "How to help me remember:",
+					Value: "• Tell me about your **hobbies** (gaming, cosplay?)\n" +
+						"• Mention your **job** or what you study\n" +
+						"• Share your **likes/dislikes**\n\n" +
+						"*Just chat naturally, I'll take notes!* 📝",
+				},
+			},
 		}
 	} else {
 		// Format facts nicely
