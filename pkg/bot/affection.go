@@ -582,9 +582,12 @@ Output ONLY valid JSON. Example: {"sentiment": "neutral"}`, userMessage, marinRe
 	// Parse JSON response
 	jsonStr := strings.TrimSpace(resp)
 	if strings.HasPrefix(jsonStr, "```") {
-		lines := strings.Split(jsonStr, "\n")
-		if len(lines) >= 2 {
-			jsonStr = strings.Join(lines[1:len(lines)-1], "\n")
+		// Find first newline
+		if idx := strings.Index(jsonStr, "\n"); idx != -1 {
+			// Find last newline
+			if lastIdx := strings.LastIndex(jsonStr, "\n"); lastIdx > idx {
+				jsonStr = jsonStr[idx+1 : lastIdx]
+			}
 		}
 	}
 	jsonStr = strings.TrimSpace(jsonStr)

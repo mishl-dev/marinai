@@ -129,6 +129,7 @@ func (s *SurrealStore) GetCachedEmojis(guildID string) ([]string, error) {
 	var emojis []string
 	if row, ok := rows[0].(map[string]interface{}); ok {
 		if e, ok := row["emojis"].([]interface{}); ok {
+			emojis = make([]string, 0, len(e))
 			for _, item := range e {
 				if str, ok := item.(string); ok {
 					emojis = append(emojis, str)
@@ -311,7 +312,7 @@ func (s *SurrealStore) GetRecentMessages(userID string) ([]RecentMessageItem, er
 		return []RecentMessageItem{}, nil
 	}
 
-	var messages []RecentMessageItem
+	messages := make([]RecentMessageItem, 0, len(rows))
 	for _, row := range rows {
 		if rowMap, ok := row.(map[string]interface{}); ok {
 			// Manually map fields to struct to be safe
@@ -378,7 +379,7 @@ func (s *SurrealStore) GetDueReminders() ([]Reminder, error) {
 		return []Reminder{}, nil
 	}
 
-	var reminders []Reminder
+	reminders := make([]Reminder, 0, len(rows))
 	for _, row := range rows {
 		if rowMap, ok := row.(map[string]interface{}); ok {
 			r := Reminder{}
@@ -556,7 +557,7 @@ func (s *SurrealStore) GetAllKnownUsers() ([]string, error) {
 
 	// If result is []interface{} (generic list)
 	if list, ok := result.([]interface{}); ok {
-		var users []string
+		users := make([]string, 0, len(list))
 		for _, item := range list {
 			if str, ok := item.(string); ok {
 				users = append(users, str)
@@ -626,6 +627,9 @@ func (s *SurrealStore) GetFacts(userID string) ([]string, error) {
 		}
 
 		if f, ok := rawFacts.([]interface{}); ok {
+			if len(facts) == 0 {
+				facts = make([]string, 0, len(f))
+			}
 			for _, item := range f {
 				// Facts are now objects with {text: string, created_at: int}
 				if factMap, ok := item.(map[string]interface{}); ok {

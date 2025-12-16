@@ -17,7 +17,7 @@ func (h *Handler) getRelevantEmojis(guildID string, s Session) []string {
 	if err == nil && len(cached) > 0 {
 		// Verify if cached items are in "name:id" format (new format)
 		if strings.Contains(cached[0], ":") {
-			var formatted []string
+			formatted := make([]string, 0, len(cached))
 			for _, item := range cached {
 				parts := strings.Split(item, ":")
 				if len(parts) == 2 {
@@ -38,8 +38,8 @@ func (h *Handler) getRelevantEmojis(guildID string, s Session) []string {
 	}
 
 	// Build emoji list for filtering (names only)
-	var emojiNames []string
-	nameToEmoji := make(map[string]*discordgo.Emoji)
+	emojiNames := make([]string, 0, len(emojis))
+	nameToEmoji := make(map[string]*discordgo.Emoji, len(emojis))
 	for _, emoji := range emojis {
 		emojiNames = append(emojiNames, emoji.Name)
 		nameToEmoji[emoji.Name] = emoji
@@ -83,8 +83,8 @@ Return ONLY the emoji names that should be kept, separated by commas. If none ar
 		}
 
 		// Fallback caching
-		var cacheItems []string
-		var result []string
+		cacheItems := make([]string, 0, len(emojiNames))
+		result := make([]string, 0, len(emojiNames))
 		for _, name := range emojiNames {
 			if e, ok := nameToEmoji[name]; ok {
 				cacheItems = append(cacheItems, fmt.Sprintf("%s:%s", e.Name, e.ID))
@@ -109,8 +109,8 @@ Return ONLY the emoji names that should be kept, separated by commas. If none ar
 	}
 
 	// 3. Map names back to IDs and Cache
-	var cacheItems []string // format: "name:id"
-	var result []string     // format: "<:name:id>"
+	cacheItems := make([]string, 0, len(filteredNames))
+	result := make([]string, 0, len(filteredNames)) // format: "<:name:id>"
 
 	for _, name := range filteredNames {
 		if e, ok := nameToEmoji[name]; ok {

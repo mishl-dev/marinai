@@ -320,9 +320,12 @@ Output ONLY valid JSON. Example: {"label": "neutral", "confidence": 0.85}`, labe
 
 	// Strip markdown code blocks if present
 	if strings.HasPrefix(responseText, "```") {
-		lines := strings.Split(responseText, "\n")
-		if len(lines) >= 2 {
-			responseText = strings.Join(lines[1:len(lines)-1], "\n")
+		// Find first newline
+		if idx := strings.Index(responseText, "\n"); idx != -1 {
+			// Find last newline
+			if lastIdx := strings.LastIndex(responseText, "\n"); lastIdx > idx {
+				responseText = responseText[idx+1 : lastIdx]
+			}
 		}
 	}
 	responseText = strings.TrimSpace(responseText)
