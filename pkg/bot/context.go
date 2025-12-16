@@ -14,13 +14,13 @@ import (
 
 // MessageContext holds all the context gathered for a user message
 type MessageContext struct {
-	RecentMessages  []memory.RecentMessageItem
-	Matches         []string
-	Facts           []string
-	EmojiText       string
-	ImageContext    string
-	ComebackContext string // Set when user returns after boredom DMs
-	TimeContext     string // Current time/date/season awareness
+	RecentMessages   []memory.RecentMessageItem
+	Matches          []string
+	Facts            []string
+	EmojiText        string
+	ImageContext     string
+	ComebackContext  string // Set when user returns after boredom DMs
+	TimeContext      string // Current time/date/season awareness
 }
 
 // gatherMessageContext gathers all necessary context data in parallel

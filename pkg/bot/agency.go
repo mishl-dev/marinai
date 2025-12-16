@@ -366,7 +366,7 @@ Write a very short, casual message (1-2 sentences max) to send them. It should f
 Rules:
 - Be casual, lowercase, natural texting style
 - Reference what you're currently doing or thinking about
-- Could reference something you know about them
+- Could reference something you know about them, or ask how something they mentioned is going
 - Should feel like you just randomly thought of them
 - No roleplay actions like *does something*
 
@@ -385,3 +385,4 @@ Just output the message, nothing else.`, h.GetStateForPrompt(), level.Emoji, lev
 
 	return strings.TrimSpace(reply)
 }
+
