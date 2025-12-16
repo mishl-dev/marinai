@@ -67,12 +67,19 @@ type Request struct {
 	Messages    []Message `json:"messages"`
 }
 
+type Usage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
 type Response struct {
 	Choices []struct {
 		Message struct {
 			Content string `json:"content"`
 		} `json:"message"`
 	} `json:"choices"`
+	Usage Usage `json:"usage"`
 }
 
 // APIError captures non-200 responses to allow inspection of the status code.
@@ -186,13 +193,14 @@ func (c *Client) ChatCompletion(messages []Message) (string, error) {
 		}
 
 		start := time.Now()
-		content, err := c.makeRequestWithKey(reqBody, keyState.Key)
+		content, usage, err := c.makeRequestWithKey(reqBody, keyState.Key)
 		duration := time.Since(start)
 
 		if err == nil {
 			// Success: Received a 200 OK and valid content
 			c.recordSuccess(keyState)
-			log.Printf("Model %s success (took %v, %d chars)", modelConf.ID, duration, len(content))
+			log.Printf("Model %s success (took %v, input_tokens=%d, output_tokens=%d, total_tokens=%d)",
+				modelConf.ID, duration, usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens)
 			return content, nil
 		}
 
@@ -206,10 +214,11 @@ func (c *Client) ChatCompletion(messages []Message) (string, error) {
 					log.Printf("Key rate limited/auth failed, trying another key...")
 					keyState = nextKey
 					// Retry same model with new key
-					content, err = c.makeRequestWithKey(reqBody, keyState.Key)
+					content, usage, err = c.makeRequestWithKey(reqBody, keyState.Key)
 					if err == nil {
 						c.recordSuccess(keyState)
-						log.Printf("Model %s success with alternate key (took %v)", modelConf.ID, time.Since(start))
+						log.Printf("Model %s success with alternate key (took %v, input_tokens=%d, output_tokens=%d, total_tokens=%d)",
+							modelConf.ID, time.Since(start), usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens)
 						return content, nil
 					}
 				}
@@ -227,15 +236,15 @@ func (c *Client) ChatCompletion(messages []Message) (string, error) {
 	return "", fmt.Errorf("all models exhausted. Last error: %w", lastErr)
 }
 
-func (c *Client) makeRequestWithKey(reqBody Request, apiKey string) (string, error) {
+func (c *Client) makeRequestWithKey(reqBody Request, apiKey string) (string, Usage, error) {
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", Usage{}, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		return "", Usage{}, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -243,7 +252,7 @@ func (c *Client) makeRequestWithKey(reqBody Request, apiKey string) (string, err
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to perform request: %w", err)
+		return "", Usage{}, fmt.Errorf("failed to perform request: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -251,7 +260,7 @@ func (c *Client) makeRequestWithKey(reqBody Request, apiKey string) (string, err
 	// This triggers the loop in ChatCompletion to try the next model.
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return "", &APIError{
+		return "", Usage{}, &APIError{
 			StatusCode: resp.StatusCode,
 			Body:       string(bodyBytes),
 		}
@@ -259,11 +268,11 @@ func (c *Client) makeRequestWithKey(reqBody Request, apiKey string) (string, err
 
 	var apiResp Response
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
+		return "", Usage{}, fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	if len(apiResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
+		return "", Usage{}, fmt.Errorf("no choices in response")
 	}
 
 	content := apiResp.Choices[0].Message.Content
@@ -280,7 +289,7 @@ func (c *Client) makeRequestWithKey(reqBody Request, apiKey string) (string, err
 		content = strings.TrimSpace(content)
 	}
 
-	return content, nil
+	return content, apiResp.Usage, nil
 }
 
 // Classify uses llama3.1-8b (fast model) to classify text into one of the provided labels
@@ -324,7 +333,7 @@ Output ONLY valid JSON. Example: {"label": "neutral", "confidence": 0.85}`, labe
 		return labels[0], 0.5, fmt.Errorf("no API keys configured")
 	}
 
-	resp, err := c.makeRequestWithKey(reqBody, keyState.Key)
+	resp, _, err := c.makeRequestWithKey(reqBody, keyState.Key)
 	if err != nil {
 		c.recordFailure(keyState)
 		return labels[0], 0.5, err // Fallback to first label
