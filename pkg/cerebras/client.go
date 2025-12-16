@@ -206,6 +206,15 @@ func (c *Client) ChatCompletion(messages []Message) (string, error) {
 
 		// Check if it's a rate limit or auth error - try another key
 		if apiErr, ok := err.(*APIError); ok {
+			// Log specific model failure for visibility
+			bodyPreview := apiErr.Body
+			if len(bodyPreview) > 200 {
+				bodyPreview = bodyPreview[:200] + "..."
+			}
+			// Sanitize newlines to keep logs clean
+			bodyPreview = strings.ReplaceAll(bodyPreview, "\n", " ")
+			log.Printf("Warning: Model %s failed (status %d): %s", modelConf.ID, apiErr.StatusCode, bodyPreview)
+
 			if apiErr.StatusCode == 429 || apiErr.StatusCode == 401 || apiErr.StatusCode == 403 {
 				c.recordFailure(keyState)
 				// Try to get another key
@@ -225,6 +234,7 @@ func (c *Client) ChatCompletion(messages []Message) (string, error) {
 			}
 			lastErr = fmt.Errorf("model %s failed with status %d: %w", modelConf.ID, apiErr.StatusCode, apiErr)
 		} else {
+			log.Printf("Warning: Model %s network/other error: %v", modelConf.ID, err)
 			lastErr = fmt.Errorf("model %s network error: %w", modelConf.ID, err)
 		}
 
