@@ -39,6 +39,17 @@ var MoodDescriptions = map[string]string{
 	MoodNostalgic: "thinking about old times",
 }
 
+// MoodColors maps moods to their representative hex colors for Embeds
+var MoodColors = map[string]int{
+	MoodHappy:     0xFFD700, // Gold
+	MoodHyper:     0xFF4500, // Orange Red
+	MoodSleepy:    0xADD8E6, // Light Blue
+	MoodBored:     0x808080, // Gray
+	MoodFlirty:    0xFF69B4, // Hot Pink
+	MoodFocused:   0x4169E1, // Royal Blue
+	MoodNostalgic: 0xDDA0DD, // Plum
+}
+
 // MoodInstructions for the LLM prompt - must not contradict base system prompt
 var MoodInstructions = map[string]string{
 	MoodHappy: `Current Mood: HAPPY

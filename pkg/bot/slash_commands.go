@@ -224,29 +224,45 @@ func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 func handleMoodCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
 	mood, emoji, description := h.GetCurrentMood()
 
-	responseContent := fmt.Sprintf("%s **%s**\n\n%s", emoji, mood, description)
+	// Get color for current mood
+	color := MoodColors[mood]
+	if color == 0 {
+		color = 0xFFD700 // Default to Gold (Happy)
+	}
 
 	// Add a little extra flavor based on mood
+	var flavorText string
 	switch mood {
 	case MoodHyper:
-		responseContent += "\n\n*bounces around excitedly*"
+		flavorText = "*bounces around excitedly*"
 	case MoodSleepy:
-		responseContent += "\n\n*yawns*"
+		flavorText = "*yawns*"
 	case MoodFlirty:
-		responseContent += " 😏"
+		flavorText = "😏"
 	case MoodNostalgic:
-		responseContent += "\n\n*stares out the window wistfully*"
+		flavorText = "*stares out the window wistfully*"
 	case MoodFocused:
-		responseContent += "\n\n*adjusts glasses*"
+		flavorText = "*adjusts glasses*"
 	case MoodBored:
-		responseContent += "\n\n*sighs*"
+		flavorText = "*sighs*"
+	}
+
+	// Construct Embed
+	embed := &discordgo.MessageEmbed{
+		Title:       fmt.Sprintf("%s Current Mood: %s", emoji, mood),
+		Description: description,
+		Color:       color,
+	}
+
+	if flavorText != "" {
+		embed.Description += "\n\n" + flavorText
 	}
 
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: responseContent,
-			Flags:   discordgo.MessageFlagsEphemeral,
+			Embeds: []*discordgo.MessageEmbed{embed},
+			Flags:  discordgo.MessageFlagsEphemeral,
 		},
 	})
 
