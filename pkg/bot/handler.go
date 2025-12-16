@@ -45,11 +45,11 @@ type Handler struct {
 }
 
 type MessageContext struct {
-	RecentMessages []memory.RecentMessageItem
-	Matches        []string
-	Facts          []string
-	EmojiText      string
-	ImageContext   string
+	RecentMessages  []memory.RecentMessageItem
+	Matches         []string
+	Facts           []string
+	EmojiText       string
+	ImageContext    string
 	ComebackContext string // Set when user returns after boredom DMs
 	TimeContext     string // Current time/date/season awareness
 }
@@ -376,7 +376,7 @@ func (h *Handler) buildConversationMessages(displayName, userContent string, ctx
 
 	// Build the full system prompt with time awareness
 	systemPrompt := fmt.Sprintf("%s\n\n%s\n\n%s", fmt.Sprintf(SystemPrompt, displayName, profileText), moodInstruction, statePrompt)
-	
+
 	// Add time context if available
 	if ctx.TimeContext != "" {
 		systemPrompt = ctx.TimeContext + "\n\n" + systemPrompt
@@ -502,7 +502,7 @@ func (h *Handler) gatherMessageContext(s Session, userID, content string, channe
 		// Tokyo time for Marin
 		loc := time.FixedZone("Asia/Tokyo", 9*60*60)
 		now := time.Now().In(loc)
-		
+
 		// Get time of day
 		hour := now.Hour()
 		var timeOfDay string
@@ -516,7 +516,7 @@ func (h *Handler) gatherMessageContext(s Session, userID, content string, channe
 		default:
 			timeOfDay = "night"
 		}
-		
+
 		// Get season (Northern Hemisphere / Japan)
 		month := now.Month()
 		var season string
@@ -530,7 +530,7 @@ func (h *Handler) gatherMessageContext(s Session, userID, content string, channe
 		default:
 			season = "winter"
 		}
-		
+
 		// Check for special days/holidays
 		var specialDay string
 		day := now.Day()
@@ -548,7 +548,7 @@ func (h *Handler) gatherMessageContext(s Session, userID, content string, channe
 		case month == 10 && day == 31:
 			specialDay = " (Halloween!)"
 		}
-		
+
 		ctx.TimeContext = fmt.Sprintf("[Current Time: %s, %s %d - %s, %s%s]",
 			timeOfDay, now.Month().String(), day, now.Weekday().String(), season, specialDay)
 	}()

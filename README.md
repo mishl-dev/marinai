@@ -286,6 +286,18 @@ marinai/
 go test ./...
 ```
 
+### Developer Tools
+
+We include a helper script to verify your development environment:
+
+```bash
+# Check dependencies, config, formatting, and run fast tests
+./scripts/dev-check.sh
+
+# Run all tests (including long running ones)
+./scripts/dev-check.sh --all
+```
+
 ### Project Structure
 
 | Package | Purpose |
