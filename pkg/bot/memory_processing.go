@@ -70,16 +70,6 @@ func (h *Handler) extractMemories(userID string, userName string, userMessage st
 - Information that is clearly already known (see Current Profile)`
 
 	// User Prompt: Focuses on extracting useful personal information
-	// What to ignore - expanded to prevent self-learning
-	exclusionList := `
-- Temporary states: "I'm hungry", "I'm tired", "I'm busy right now"
-- Single-use preferences: "I like that joke", "that's funny"
-- Questions they asked
-- Generic greetings
-- Facts about Marin, the AI, or the character she is roleplaying
-- Information that is clearly already known (see Current Profile)`
-
-	// User Prompt: Focuses on extracting useful personal information
 	extractionPrompt := fmt.Sprintf(`Current Profile:
 %s
 
