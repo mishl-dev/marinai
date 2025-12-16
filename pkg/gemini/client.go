@@ -12,13 +12,14 @@ import (
 )
 
 const (
-	geminiAPIURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent"
+	defaultGeminiAPIURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent"
 )
 
 // Client handles image understanding via Gemini Vision API
 type Client struct {
 	apiKey string
 	client *http.Client
+	apiURL string
 }
 
 // NewClient creates a new Gemini Vision client
@@ -28,6 +29,7 @@ func NewClient(apiKey string) *Client {
 		client: &http.Client{
 			Timeout: 90 * time.Second,
 		},
+		apiURL: defaultGeminiAPIURL,
 	}
 }
 
@@ -134,7 +136,7 @@ If there's text in the image, mention what it says.`
 	}
 
 	// Make the request
-	url := fmt.Sprintf("%s?key=%s", geminiAPIURL, c.apiKey)
+	url := fmt.Sprintf("%s?key=%s", c.apiURL, c.apiKey)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -281,7 +283,7 @@ Output ONLY valid JSON. Example: {"label": "neutral", "confidence": 0.85}`, labe
 		return "", 0, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s?key=%s", geminiAPIURL, c.apiKey)
+	url := fmt.Sprintf("%s?key=%s", c.apiURL, c.apiKey)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to create request: %w", err)
