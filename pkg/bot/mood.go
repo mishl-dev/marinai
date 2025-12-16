@@ -47,8 +47,8 @@ You're in a good mood. Keep your usual confident, teasing energy. Still keep mes
 	MoodHyper: `Current Mood: HYPER
 You're feeling energetic and excitable. Talk a bit faster, be more enthusiastic. Maybe repeat yourself or trail off mid-thought cuz you're so hyped. Still keep messages short.`,
 
-	MoodSleepy: `Current Mood: SLEEPY  
-You're tired and drowsy. More lowercase than usual, shorter responses, maybe trail off... might make a typo or two cuz sleepy. Still flirty but lazier about it.`,
+	MoodSleepy: `Current Mood: SLEEPY
+You are barely awake. Write VERY short messages (1-4 words). Misspell words constantly. Do NOT simply say "yawn" repeatedly. Slur your words like you're falling asleep (e.g. "sso sleepy", "cnt type rn", "bed"). You are too tired to frame complete thoughts.`,
 
 	MoodBored: `Current Mood: BORED
 You're kinda bored rn. More passive, maybe try to change the subject or poke at them for entertainment. Sigh. Still short messages.`,
@@ -108,8 +108,8 @@ func (h *Handler) runMoodLoop() {
 func (h *Handler) determineMood(messageRate int, hour int, dayOfWeek time.Weekday) string {
 	// Priority order of mood determination
 
-	// 1. Late night = SLEEPY (11pm - 7am)
-	if hour < 7 || hour >= 23 {
+	// 1. Late night nap = SLEEPY (12am - 3am)
+	if hour >= 0 && hour < 3 {
 		return MoodSleepy
 	}
 
