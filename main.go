@@ -108,10 +108,12 @@ func main() {
 		embeddingClient,
 		geminiClient,
 		memoryStore,
-		cfg.Delays.MessageProcessing,
-		cfg.MemorySettings.FactAgingDays,
-		cfg.MemorySettings.FactSummarizationThreshold,
-		cfg.MemorySettings.MaintenanceIntervalHours,
+		bot.HandlerConfig{
+			MessageProcessingDelay:     cfg.Delays.MessageProcessing,
+			FactAgingDays:              cfg.MemorySettings.FactAgingDays,
+			FactSummarizationThreshold: cfg.MemorySettings.FactSummarizationThreshold,
+			MaintenanceIntervalHours:   cfg.MemorySettings.MaintenanceIntervalHours,
+		},
 	)
 
 	// Create Discord Session

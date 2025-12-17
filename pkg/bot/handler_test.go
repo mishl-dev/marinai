@@ -129,7 +129,12 @@ func TestHandler_Flow(t *testing.T) {
 
 	// Initialize Handler
 	mockGemini := &MockGeminiClient{}
-	handler := NewHandler(cerebrasClient, embeddingClient, mockGemini, memoryStore, 0, 7, 20, 24)
+	handler := NewHandler(cerebrasClient, embeddingClient, mockGemini, memoryStore, HandlerConfig{
+		MessageProcessingDelay:     0,
+		FactAgingDays:              7,
+		FactSummarizationThreshold: 20,
+		MaintenanceIntervalHours:   24,
+	})
 	botID := "mock_bot_id"
 	handler.SetBotID(botID)
 
@@ -230,7 +235,12 @@ func TestHandler_FlowStructure(t *testing.T) {
 	memoryStore.AddRecentMessage("test_user_structure", "assistant", "It was fine, I guess.")
 
 	mockGemini := &MockGeminiClient{}
-	handler := NewHandler(cerebrasClient, embeddingClient, mockGemini, memoryStore, 0, 7, 20, 24)
+	handler := NewHandler(cerebrasClient, embeddingClient, mockGemini, memoryStore, HandlerConfig{
+		MessageProcessingDelay:     0,
+		FactAgingDays:              7,
+		FactSummarizationThreshold: 20,
+		MaintenanceIntervalHours:   24,
+	})
 	botID := "mock_bot_id"
 	handler.SetBotID(botID)
 
@@ -322,7 +332,12 @@ func TestHandler_DMBehavior(t *testing.T) {
 	memoryStore := memory.NewFileStore(tmpDir)
 
 	mockGemini := &MockGeminiClient{}
-	handler := NewHandler(cerebrasClient, embeddingClient, mockGemini, memoryStore, 0, 7, 20, 24)
+	handler := NewHandler(cerebrasClient, embeddingClient, mockGemini, memoryStore, HandlerConfig{
+		MessageProcessingDelay:     0,
+		FactAgingDays:              7,
+		FactSummarizationThreshold: 20,
+		MaintenanceIntervalHours:   24,
+	})
 	botID := "mock_bot_id"
 	handler.SetBotID(botID)
 

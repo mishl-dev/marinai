@@ -45,7 +45,15 @@ type Handler struct {
 	moodMu         sync.RWMutex
 }
 
-func NewHandler(c CerebrasClient, e EmbeddingClient, g GeminiClient, m memory.Store, messageProcessingDelay float64, factAgingDays int, factSummarizationThreshold int, maintenanceIntervalHours float64) *Handler {
+// HandlerConfig holds configuration values for the bot handler
+type HandlerConfig struct {
+	MessageProcessingDelay     float64
+	FactAgingDays              int
+	FactSummarizationThreshold int
+	MaintenanceIntervalHours   float64
+}
+
+func NewHandler(c CerebrasClient, e EmbeddingClient, g GeminiClient, m memory.Store, cfg HandlerConfig) *Handler {
 	h := &Handler{
 		cerebrasClient:             c,
 		embeddingClient:            e,
@@ -53,11 +61,11 @@ func NewHandler(c CerebrasClient, e EmbeddingClient, g GeminiClient, m memory.St
 		memoryStore:                m,
 		taskAgent:                  NewTaskAgent(c, g),
 		lastMessageTimes:           make(map[string]time.Time),
-		messageProcessingDelay:     time.Duration(messageProcessingDelay * float64(time.Second)),
+		messageProcessingDelay:     time.Duration(cfg.MessageProcessingDelay * float64(time.Second)),
 		processingUsers:            make(map[string]bool),
-		factAgingDays:              factAgingDays,
-		factSummarizationThreshold: factSummarizationThreshold,
-		maintenanceInterval:        time.Duration(maintenanceIntervalHours * float64(time.Hour)),
+		factAgingDays:              cfg.FactAgingDays,
+		factSummarizationThreshold: cfg.FactSummarizationThreshold,
+		maintenanceInterval:        time.Duration(cfg.MaintenanceIntervalHours * float64(time.Hour)),
 		activeUsers:                make(map[string]bool),
 		lastGlobalInteraction:      time.Now(), // Initialize with current time so she doesn't feel lonely immediately
 		currentMood:                "HAPPY",    // Default mood
