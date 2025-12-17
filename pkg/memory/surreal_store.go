@@ -1241,6 +1241,11 @@ func (s *SurrealStore) DeleteDelayedThought(id string) error {
 		parts := strings.SplitN(id, ":", 2)
 		tb = parts[0]
 		key = parts[1]
+
+		// Security: Ensure we are only deleting from the delayed_thoughts table
+		if tb != "delayed_thoughts" {
+			return fmt.Errorf("security error: attempting to delete from invalid table '%s' via DeleteDelayedThought", tb)
+		}
 	} else {
 		tb = "delayed_thoughts"
 		key = id
