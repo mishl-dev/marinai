@@ -66,19 +66,35 @@ func (h *Handler) clearInactiveUsers() {
 	defer ticker.Stop()
 
 	for range ticker.C {
+		// 1. Identify inactive users (hold lock briefly)
+		var inactiveUsers []string
 		h.lastMessageMu.Lock()
 		for userID, lastTime := range h.lastMessageTimes {
-			// If user has been inactive for 30 minutes, clear their recent memory
 			if time.Since(lastTime) > 30*time.Minute {
-				log.Printf("User %s has been inactive for 30 minutes, clearing recent memory", userID)
-				if err := h.memoryStore.ClearRecentMessages(userID); err != nil {
-					log.Printf("Error clearing recent messages for inactive user %s: %v", userID, err)
-				}
-				// Remove from tracking map
-				delete(h.lastMessageTimes, userID)
+				inactiveUsers = append(inactiveUsers, userID)
 			}
 		}
 		h.lastMessageMu.Unlock()
+
+		// 2. Process them (no lock held during DB calls)
+		for _, userID := range inactiveUsers {
+			log.Printf("User %s has been inactive for 30 minutes, clearing recent memory", userID)
+
+			// Perform DB operation (potentially slow) outside of lock
+			if err := h.memoryStore.ClearRecentMessages(userID); err != nil {
+				log.Printf("Error clearing recent messages for inactive user %s: %v", userID, err)
+			}
+
+			// 3. Remove from map (re-acquire lock)
+			h.lastMessageMu.Lock()
+			// Double check they haven't become active in the meantime
+			if lastTime, exists := h.lastMessageTimes[userID]; exists {
+				if time.Since(lastTime) > 30*time.Minute {
+					delete(h.lastMessageTimes, userID)
+				}
+			}
+			h.lastMessageMu.Unlock()
+		}
 	}
 }
 
