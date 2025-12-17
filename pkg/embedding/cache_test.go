@@ -56,9 +56,15 @@ func TestCachedClient_LRU(t *testing.T) {
 		text := reqBody["texts"][0]
 
 		var val float32
-		if text == "one" { val = 1.0 }
-		if text == "two" { val = 2.0 }
-		if text == "three" { val = 3.0 }
+		if text == "one" {
+			val = 1.0
+		}
+		if text == "two" {
+			val = 2.0
+		}
+		if text == "three" {
+			val = 3.0
+		}
 
 		resp := map[string][][]float32{
 			"embeddings": {{val}},

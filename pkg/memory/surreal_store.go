@@ -122,8 +122,8 @@ func (s *SurrealStore) Init() error {
 
 	// -- Migrations --
 	// Run these separately and log output to ensure they work
-	// We use a single combined query with the coalescing operator (??) to ensure that 
-	// when we touch a record, we fix ALL invalid fields at once. 
+	// We use a single combined query with the coalescing operator (??) to ensure that
+	// when we touch a record, we fix ALL invalid fields at once.
 	// Otherwise, fixing just one field will fail because the other existing NONE fields violate the schema.
 	migrationQuery := `
 		UPDATE user_profiles SET 

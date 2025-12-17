@@ -423,7 +423,6 @@ func (h *Handler) buildConversationMessages(displayName, userContent string, ctx
 	return messages
 }
 
-
 func (h *Handler) cleanupLoop() {
 	// Run cleanup every hour
 	ticker := time.NewTicker(1 * time.Hour)
