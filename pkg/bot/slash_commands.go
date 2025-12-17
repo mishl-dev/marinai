@@ -52,11 +52,17 @@ func handleResetCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 							Label:    "Confirm Reset",
 							Style:    discordgo.DangerButton,
 							CustomID: "reset_confirm",
+							Emoji: &discordgo.ComponentEmoji{
+								Name: "🗑️",
+							},
 						},
 						discordgo.Button{
 							Label:    "Cancel",
 							Style:    discordgo.SecondaryButton,
 							CustomID: "reset_cancel",
+							Emoji: &discordgo.ComponentEmoji{
+								Name: "✖️",
+							},
 						},
 					},
 				},
