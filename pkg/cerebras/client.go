@@ -331,7 +331,7 @@ Output ONLY valid JSON. Example: {"label": "neutral", "confidence": 0.85}`, labe
 	}
 
 	reqBody := Request{
-		Model:       "llama-3.3-70b",
+		Model:       "gpt-oss-120b",
 		Stream:      false,
 		MaxTokens:   100, // Classification only needs short output
 		Temperature: 0.1, // Low temperature for consistent classification
