@@ -356,7 +356,12 @@ func TestMessageFlow(t *testing.T) {
 	mockSession := &mockDiscordSession{}
 
 	mockGemini := &MockGeminiClient{}
-	handler := NewHandler(mockCerebras, mockEmbedding, mockGemini, mockMemory, 0, 7, 20, 24)
+	handler := NewHandler(mockCerebras, mockEmbedding, mockGemini, mockMemory, HandlerConfig{
+		MessageProcessingDelay:     0,
+		FactAgingDays:              7,
+		FactSummarizationThreshold: 20,
+		MaintenanceIntervalHours:   24,
+	})
 	handler.SetBotID("testbot")
 
 	// Spies
