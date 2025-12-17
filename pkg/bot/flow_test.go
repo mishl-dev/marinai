@@ -68,6 +68,7 @@ type mockMemoryStore struct {
 	GetAffectionFunc            func(userID string) (int, error)
 	AddAffectionFunc            func(userID string, amount int) error
 	SetAffectionFunc            func(userID string, amount int) error
+	AddReminderFunc             func(userID string, text string, dueAt int64) error
 }
 
 func (m *mockMemoryStore) Add(userID string, text string, vector []float32) error {
@@ -170,6 +171,9 @@ func (m *mockMemoryStore) EnsureUser(userID string) error {
 }
 
 func (m *mockMemoryStore) AddReminder(userID string, text string, dueAt int64) error {
+	if m.AddReminderFunc != nil {
+		return m.AddReminderFunc(userID, text, dueAt)
+	}
 	return nil
 }
 

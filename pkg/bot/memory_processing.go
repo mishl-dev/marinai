@@ -129,19 +129,30 @@ Output ONLY valid JSON with "add", "remove", and "reminders" arrays.`, userName,
 	jsonStr := strings.TrimSpace(resp)
 
 	// Robust markdown stripping
-	if strings.HasPrefix(jsonStr, "```") {
-		// Find first newline
-		if idx := strings.Index(jsonStr, "\n"); idx != -1 {
-			// Find last newline
-			if lastIdx := strings.LastIndex(jsonStr, "\n"); lastIdx > idx {
-				// Slice the string between the first and last newline
-				// We exclude the first newline char (idx+1)
-				// We rely on strings.TrimSpace later to handle any surrounding whitespace
-				jsonStr = jsonStr[idx+1 : lastIdx]
-			}
+	if idx := strings.Index(jsonStr, "```"); idx != -1 {
+		// Find the end of the code block, starting search after the first backticks
+		if endIdx := strings.Index(jsonStr[idx+3:], "```"); endIdx != -1 {
+			// Adjust endIdx relative to original string
+			endIdx += idx + 3
+
+			// Extract content inside the backticks
+			blockContent := jsonStr[idx+3 : endIdx]
+
+			// Trim "json" if it exists at the start of the block (common in LLM output)
+			blockContent = strings.TrimPrefix(strings.TrimSpace(blockContent), "json")
+
+			jsonStr = strings.TrimSpace(blockContent)
 		}
 	}
-	jsonStr = strings.TrimSpace(jsonStr)
+	// Fallback: If no markdown block is found, assume the whole string is JSON (or try to parse it)
+	// But first, let's try to find the outer braces if the string has garbage around it but no markdown
+	if !strings.HasPrefix(jsonStr, "{") {
+		start := strings.Index(jsonStr, "{")
+		end := strings.LastIndex(jsonStr, "}")
+		if start != -1 && end != -1 && end > start {
+			jsonStr = jsonStr[start : end+1]
+		}
+	}
 
 	type Delta struct {
 		Add       []string          `json:"add"`
