@@ -298,8 +298,9 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 			}
 		}
 
-		// Maybe queue a continuation thought for later (makes Marin feel more real)
-		h.QueueContinuation(m.Author.ID, m.Content, reply)
+		// NOTE: Continuation thoughts are now queued when the user goes inactive
+		// (see clearInactiveUsers in utils.go) - this ensures we only follow up
+		// on conversations that actually ended with Marin's reply
 	}()
 }
 

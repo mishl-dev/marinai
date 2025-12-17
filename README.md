@@ -117,6 +117,17 @@ Marin has her own **internal state** that makes her feel alive:
 - Higher affection = higher chance of random messages
 - Messages reference what she's currently doing/thinking
 
+#### 🔄 Conversation Continuation (Delayed Thoughts)
+When a conversation ends with Marin's reply (you "leave her on read"), she might come back later with a follow-up thought:
+
+- **Trigger**: User goes inactive for 30+ minutes after Marin's last message
+- **Chance**: Based on affection level (5% for casual friends → 35% for Special Someone)
+- **Delay**: Higher affection = shorter delay (30 min-3 hrs for close friends, 4-12 hrs for newer friends)
+- **Context-aware**: References what you were talking about earlier
+- **Natural**: Messages like *"wait i was thinking about what you said earlier..."*
+
+This makes Marin feel like a real person who thinks about conversations after they end, rather than immediately forgetting.
+
 #### 📓 Personal Journal
 - Marin has her own activities, projects, and thoughts
 - **Current Activity**: "working on a cosplay", "watching anime", etc.

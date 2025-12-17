@@ -78,9 +78,13 @@ func (h *Handler) clearInactiveUsers() {
 
 		// 2. Process them (no lock held during DB calls)
 		for _, userID := range inactiveUsers {
-			log.Printf("User %s has been inactive for 30 minutes, clearing recent memory", userID)
+			log.Printf("User %s has been inactive for 30 minutes", userID)
 
-			// Perform DB operation (potentially slow) outside of lock
+			// Check for continuation opportunity BEFORE clearing messages
+			// This is where we queue thoughts - when the conversation genuinely ended
+			h.checkContinuationOpportunity(userID)
+
+			// Now clear the recent messages
 			if err := h.memoryStore.ClearRecentMessages(userID); err != nil {
 				log.Printf("Error clearing recent messages for inactive user %s: %v", userID, err)
 			}
@@ -96,6 +100,38 @@ func (h *Handler) clearInactiveUsers() {
 			h.lastMessageMu.Unlock()
 		}
 	}
+}
+
+// checkContinuationOpportunity checks if Marin was the last to speak and queues a continuation
+func (h *Handler) checkContinuationOpportunity(userID string) {
+	// Get recent messages to see who spoke last
+	recentMessages, err := h.memoryStore.GetRecentMessages(userID)
+	if err != nil || len(recentMessages) == 0 {
+		return
+	}
+
+	// Check if the last message was from Marin (assistant)
+	lastMessage := recentMessages[len(recentMessages)-1]
+	if lastMessage.Role != "assistant" {
+		// User spoke last, don't queue continuation
+		return
+	}
+
+	// Find the last user message for context
+	var lastUserMsg string
+	for i := len(recentMessages) - 1; i >= 0; i-- {
+		if recentMessages[i].Role == "user" {
+			lastUserMsg = recentMessages[i].Text
+			break
+		}
+	}
+
+	if lastUserMsg == "" {
+		return // No user message found
+	}
+
+	// Queue the continuation thought (this will check affection/chance internally)
+	h.QueueContinuation(userID, lastUserMsg, lastMessage.Text)
 }
 
 func (h *Handler) WaitForReady() {
