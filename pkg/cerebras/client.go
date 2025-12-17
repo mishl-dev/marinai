@@ -28,12 +28,12 @@ type ModelConfig struct {
 }
 
 var PrioritizedModels = []ModelConfig{
-	{ID: "llama-3.3-70b", MaxCtx: 65536},
-	{ID: "zai-glm-4.6", MaxCtx: 64000},
-	{ID: "llama3.1-8b", MaxCtx: 8192},
 	{ID: "qwen-3-235b-a22b-instruct-2507", MaxCtx: 65536},
 	{ID: "qwen-3-32b", MaxCtx: 65536},
 	{ID: "gpt-oss-120b", MaxCtx: 65536},
+	{ID: "zai-glm-4.6", MaxCtx: 64000},
+	{ID: "llama-3.3-70b", MaxCtx: 65536},
+	{ID: "llama3.1-8b", MaxCtx: 8192}
 }
 
 // KeyState tracks the health of an API key
