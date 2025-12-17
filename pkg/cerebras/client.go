@@ -33,7 +33,7 @@ var PrioritizedModels = []ModelConfig{
 	{ID: "gpt-oss-120b", MaxCtx: 65536},
 	{ID: "zai-glm-4.6", MaxCtx: 64000},
 	{ID: "llama-3.3-70b", MaxCtx: 65536},
-	{ID: "llama3.1-8b", MaxCtx: 8192}
+	{ID: "llama3.1-8b", MaxCtx: 8192},
 }
 
 // KeyState tracks the health of an API key
