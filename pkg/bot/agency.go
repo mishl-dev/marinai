@@ -385,4 +385,3 @@ Just output the message, nothing else.`, h.GetStateForPrompt(), level.Emoji, lev
 
 	return strings.TrimSpace(reply)
 }
-
