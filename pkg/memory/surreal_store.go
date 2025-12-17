@@ -575,12 +575,12 @@ func (s *SurrealStore) SetState(key, value string) error {
 }
 
 func (s *SurrealStore) GetAllKnownUsers() ([]string, error) {
-	// Query both user_profiles and memories to ensure we find all known users
-	// Use array::distinct to remove duplicates
+	// Query user_profiles to find all known users
+	// Optimization: We formerly queried `memories` as well, but that table grows infinitely.
+	// Since `EnsureUser` guarantees a profile exists on interaction, user_profiles is sufficient
+	// and much faster to query (O(N) users vs O(M) memories).
 	query := `
-		LET $u1 = SELECT VALUE user_id FROM user_profiles;
-		LET $u2 = SELECT VALUE user_id FROM memories;
-		RETURN array::distinct(array::union($u1, $u2));
+		SELECT VALUE user_id FROM user_profiles;
 	`
 	result, err := s.client.Query(query, map[string]interface{}{})
 	if err != nil {
