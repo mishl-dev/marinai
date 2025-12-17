@@ -33,8 +33,8 @@ console = Console()
 # Load environment variables from .env
 env_path = Path(__file__).parent.parent / ".env"
 
-# Regex to strip <think>...</think> tags from responses
-THINK_REGEX = re.compile(r'(?s)<think>.*?</think>')
+# Regex to strip <think>, <thinking>, or <thought> tags from responses
+THINK_REGEX = re.compile(r'(?s)<(?:think|thinking|thought)>.*?</(?:think|thinking|thought)>')
 load_dotenv(env_path)
 
 # Configuration

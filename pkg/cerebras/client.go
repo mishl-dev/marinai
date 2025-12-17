@@ -17,9 +17,9 @@ const (
 	apiURL = "https://api.cerebras.ai/v1/chat/completions"
 )
 
-// thinkRegex matches <think>...</think> content, including newlines.
+// thinkRegex matches <think>, <thinking>, or <thought> tags and their content.
 // (?s) enables the dot (.) to match new lines.
-var thinkRegex = regexp.MustCompile(`(?s)<think>.*?</think>`)
+var thinkRegex = regexp.MustCompile(`(?s)<(?:think|thinking|thought)>.*?</(?:think|thinking|thought)>`)
 
 // ModelConfig defines the ID and context limits for the prioritized list.
 type ModelConfig struct {
