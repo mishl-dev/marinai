@@ -209,6 +209,11 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 		return
 	}
 
+	h.processAndReply(s, m, isMentioned, isDM, channel)
+}
+
+// processAndReply handles the core logic of processing a message and sending a reply
+func (h *Handler) processAndReply(s Session, m *discordgo.MessageCreate, isMentioned, isDM bool, channel *discordgo.Channel) {
 	// Get current mood for affection multiplier and sleepy check
 	h.moodMu.RLock()
 	currentMoodForAffection := h.currentMood
