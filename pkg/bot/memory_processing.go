@@ -12,14 +12,14 @@ import (
 
 func (h *Handler) addRecentMessage(userID, role, message string) {
 	if err := h.memoryStore.AddRecentMessage(userID, role, message); err != nil {
-		log.Printf("Error adding recent message: %v", err)
+		log.Printf("[Recent Messages] Error adding recent message: %v", err)
 	}
 }
 
 func (h *Handler) getRecentMessages(userID string) []memory.RecentMessageItem {
 	messages, err := h.memoryStore.GetRecentMessages(userID)
 	if err != nil {
-		log.Printf("Error getting recent messages: %v", err)
+		log.Printf("[Recent Messages] Error getting recent messages: %v", err)
 		return []memory.RecentMessageItem{}
 	}
 	return messages
@@ -37,14 +37,14 @@ func (h *Handler) extractMemories(userID string, userName string, userMessage st
 	}
 
 	// Let the LLM decide what's worth saving - no hardcoded keyword filters
-	log.Printf("Analyzing for memories: %s", cleanMsg)
+	log.Printf("[Memory Extraction] Analyzing for memories: %s", cleanMsg)
 
 	// ---------------------------------------------------------
 	// 2. Fetch Existing Facts
 	// ---------------------------------------------------------
 	existingFacts, err := h.memoryStore.GetFacts(userID)
 	if err != nil {
-		log.Printf("Error fetching facts for extraction: %v", err)
+		log.Printf("[Memory Extraction] Error fetching facts for extraction: %v", err)
 		return
 	}
 
@@ -119,7 +119,7 @@ Output ONLY valid JSON with "add", "remove", and "reminders" arrays.`, userName,
 	// ---------------------------------------------------------
 	resp, err := h.cerebrasClient.ChatCompletion(messages)
 	if err != nil {
-		log.Printf("Error extracting memories: %v", err)
+		log.Printf("[Memory Extraction] Error extracting memories: %v", err)
 		return
 	}
 
@@ -172,9 +172,9 @@ Output ONLY valid JSON with "add", "remove", and "reminders" arrays.`, userName,
 	// 6. Apply Delta
 	// ---------------------------------------------------------
 	if len(delta.Add) > 0 || len(delta.Remove) > 0 {
-		log.Printf("Applying memory delta for user %s: +%v, -%v", userID, delta.Add, delta.Remove)
+		log.Printf("[Memory Extraction] Applying memory delta for user %s: +%v, -%v", userID, delta.Add, delta.Remove)
 		if err := h.memoryStore.ApplyDelta(userID, delta.Add, delta.Remove); err != nil {
-			log.Printf("Error applying memory delta: %v", err)
+			log.Printf("[Memory Extraction] Error applying memory delta: %v", err)
 		}
 	}
 
@@ -184,9 +184,9 @@ Output ONLY valid JSON with "add", "remove", and "reminders" arrays.`, userName,
 	for _, r := range delta.Reminders {
 		if r.DelaySeconds > 0 {
 			dueAt := time.Now().Unix() + r.DelaySeconds
-			log.Printf("Adding reminder for user %s: %s at %d (in %d seconds)", userID, r.Text, dueAt, r.DelaySeconds)
+			log.Printf("[Memory Extraction] Adding reminder for user %s: %s at %d (in %d seconds)", userID, r.Text, dueAt, r.DelaySeconds)
 			if err := h.memoryStore.AddReminder(userID, r.Text, dueAt); err != nil {
-				log.Printf("Error adding reminder: %v", err)
+				log.Printf("[Memory Extraction] Error adding reminder: %v", err)
 			}
 		}
 	}

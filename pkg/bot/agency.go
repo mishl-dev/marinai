@@ -118,7 +118,7 @@ func (h *Handler) SetMarinState(state MarinState) {
 	state.LastUpdated = time.Now().Unix()
 	stateJSON, err := json.Marshal(state)
 	if err != nil {
-		log.Printf("Error marshaling Marin state: %v", err)
+		log.Printf("[Agency] Error marshaling Marin state: %v", err)
 		return
 	}
 	h.memoryStore.SetState("marin_internal_state", string(stateJSON))
@@ -312,20 +312,20 @@ func (h *Handler) sendProactiveThought() {
 	// Send DM
 	ch, err := h.session.UserChannelCreate(candidate.userID)
 	if err != nil {
-		log.Printf("Error creating DM channel for proactive thought: %v", err)
+		log.Printf("[Agency] Error creating DM channel for proactive thought: %v", err)
 		return
 	}
 
 	_, err = h.session.ChannelMessageSend(ch.ID, message)
 	if err != nil {
-		log.Printf("Error sending proactive thought: %v", err)
+		log.Printf("[Agency] Error sending proactive thought: %v", err)
 		return
 	}
 
 	// Mark as pending so we don't spam
 	h.memoryStore.SetPendingDM(candidate.userID, time.Now())
 
-	log.Printf("Sent proactive thought to user (affection: %d): %s", candidate.affection, message)
+	log.Printf("[Agency] Sent proactive thought to user (affection: %d): %s", candidate.affection, message)
 }
 
 // generateProactiveThought creates a personalized proactive thought
