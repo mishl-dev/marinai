@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"marinai/pkg/surreal"
+	"math/rand"
 	"reflect"
 	"strings"
 	"time"
@@ -314,29 +315,36 @@ func (s *SurrealStore) AddRecentMessage(userID, role, message string) error {
 		return err
 	}
 
-	// Cleanup old messages (keep last 15)
-	query := `
-		DELETE recent_messages
-		WHERE user_id = $user_id
-		AND id NOT IN (
-			SELECT VALUE id FROM (
-				SELECT id, timestamp FROM recent_messages
-				WHERE user_id = $user_id
-				ORDER BY timestamp DESC
-				LIMIT 15
-			)
-		);
-	`
-	_, err = s.client.Query(query, map[string]interface{}{"user_id": userID})
-	return err
+	// Optimization: Only run cleanup 10% of the time to avoid expensive DELETE/subquery on every message
+	if rand.Float64() < 0.1 {
+		// Cleanup old messages (keep last 15)
+		query := `
+			DELETE recent_messages
+			WHERE user_id = $user_id
+			AND id NOT IN (
+				SELECT VALUE id FROM (
+					SELECT id, timestamp FROM recent_messages
+					WHERE user_id = $user_id
+					ORDER BY timestamp DESC
+					LIMIT 15
+				)
+			);
+		`
+		_, err = s.client.Query(query, map[string]interface{}{"user_id": userID})
+		return err
+	}
+	return nil
 }
 
 func (s *SurrealStore) GetRecentMessages(userID string) ([]RecentMessageItem, error) {
-	// Include 'timestamp' in SELECT since we're ordering by it
+	// Optimization: Limit to latest 20 messages.
+	// We sort DESC to get the newest messages efficiently, then reverse them in memory.
+	// This prevents fetching thousands of messages if cleanup hasn't run recently.
 	query := `
 		SELECT role, text, timestamp FROM recent_messages
 		WHERE user_id = $user_id
-		ORDER BY timestamp ASC;
+		ORDER BY timestamp DESC
+		LIMIT 20;
 	`
 
 	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
@@ -374,6 +382,11 @@ func (s *SurrealStore) GetRecentMessages(userID string) ([]RecentMessageItem, er
 
 			messages = append(messages, msg)
 		}
+	}
+
+	// Reverse messages to return them in chronological order (oldest -> newest)
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
 	}
 
 	return messages, nil

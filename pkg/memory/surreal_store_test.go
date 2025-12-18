@@ -199,8 +199,8 @@ func TestSurrealStore_RecentMessages(t *testing.T) {
 
 	// Test 2: Limit check (add more messages to trigger cleanup)
 	t.Run("Limit check", func(t *testing.T) {
-		// Add 15 more messages (total 18)
-		for i := 0; i < 15; i++ {
+		// Add 25 more messages (total 28)
+		for i := 0; i < 25; i++ {
 			msg := fmt.Sprintf("Message %d", i)
 			err := store.AddRecentMessage(testUserID, "user", msg)
 			require.NoError(t, err, "Failed to add message")
@@ -210,13 +210,13 @@ func TestSurrealStore_RecentMessages(t *testing.T) {
 		storedMessages, err := store.GetRecentMessages(testUserID)
 		require.NoError(t, err, "Failed to get recent messages")
 
-		// Should be capped at 15
-		assert.Len(t, storedMessages, 15, "Expected 15 messages (limit)")
+		// Should be capped at 20 (hard limit in GetRecentMessages) since cleanup is probabilistic
+		assert.LessOrEqual(t, len(storedMessages), 20, "Expected at most 20 messages (hard limit)")
 
 		// The last message added should be present
 		if len(storedMessages) > 0 {
 			lastMsg := storedMessages[len(storedMessages)-1]
-			assert.Equal(t, "Message 14", lastMsg.Text, "Expected last message to be 'Message 14'")
+			assert.Equal(t, "Message 24", lastMsg.Text, "Expected last message to be 'Message 24'")
 		}
 
 		t.Logf("✓ Successfully enforced message limit. Count: %d", len(storedMessages))
