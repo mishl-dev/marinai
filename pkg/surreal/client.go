@@ -3,8 +3,10 @@ package surreal
 import (
 	"context"
 	"fmt"
+	"log"
 	"reflect"
 	"regexp"
+	"time"
 
 	"github.com/surrealdb/surrealdb.go"
 )
@@ -48,6 +50,7 @@ func (c *Client) Close() {
 }
 
 func (c *Client) Query(sql string, vars interface{}) (interface{}, error) {
+	start := time.Now()
 	var queryVars map[string]interface{}
 
 	if vars == nil {
@@ -59,8 +62,16 @@ func (c *Client) Query(sql string, vars interface{}) (interface{}, error) {
 	}
 
 	result, err := surrealdb.Query[interface{}](context.Background(), c.db, sql, queryVars)
+	duration := time.Since(start)
+
 	if err != nil {
+		log.Printf("[Surreal] Query Error: %v | Duration: %v | SQL: %s", err, duration, sql)
 		return nil, err
+	}
+
+	// Log slow queries (>100ms)
+	if duration > 100*time.Millisecond {
+		log.Printf("[Surreal] Slow Query: %v | SQL: %s", duration, sql)
 	}
 
 	// Unwrap the result: *RawQueryResponse -> Result field
@@ -99,16 +110,29 @@ func (c *Client) Query(sql string, vars interface{}) (interface{}, error) {
 }
 
 func (c *Client) Create(thing string, data interface{}) (interface{}, error) {
+	start := time.Now()
 	result, err := surrealdb.Create[interface{}](context.Background(), c.db, thing, data)
+	duration := time.Since(start)
 	if err != nil {
+		log.Printf("[Surreal] Create Error: %v | Duration: %v | Thing: %s", err, duration, thing)
 		return nil, err
+	}
+	if duration > 100*time.Millisecond {
+		log.Printf("[Surreal] Slow Create: %v | Thing: %s", duration, thing)
 	}
 	return result, nil
 }
+
 func (c *Client) Select(thing string) (interface{}, error) {
+	start := time.Now()
 	result, err := surrealdb.Select[interface{}](context.Background(), c.db, thing)
+	duration := time.Since(start)
 	if err != nil {
+		log.Printf("[Surreal] Select Error: %v | Duration: %v | Thing: %s", err, duration, thing)
 		return nil, err
+	}
+	if duration > 100*time.Millisecond {
+		log.Printf("[Surreal] Slow Select: %v | Thing: %s", duration, thing)
 	}
 	return result, nil
 }
