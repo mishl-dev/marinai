@@ -420,36 +420,8 @@ func (s *SurrealStore) GetDueReminders() ([]Reminder, error) {
 	for _, row := range rows {
 		if rowMap, ok := row.(map[string]interface{}); ok {
 			r := Reminder{}
-			if id, ok := rowMap["id"].(string); ok {
-				r.ID = id
-			} else if idMap, ok := rowMap["id"].(map[string]interface{}); ok {
-				// Handle RecordID object if returned as map
-				if strID, ok := idMap["String"].(string); ok {
-					r.ID = strID
-				} else if table, ok := idMap["Table"].(string); ok {
-					// Handle split Table/ID format
-					if idVal, ok := idMap["ID"].(string); ok {
-						r.ID = table + ":" + idVal
-					}
-				}
-			} else {
-				// Check for struct using reflection (common for driver-specific types)
-				val := reflect.ValueOf(rowMap["id"])
-				if val.Kind() == reflect.Struct {
-					// Try to get Table and ID fields
-					tableField := val.FieldByName("Table")
-					idField := val.FieldByName("ID")
-					if tableField.IsValid() && idField.IsValid() {
-						r.ID = fmt.Sprintf("%v:%v", tableField.Interface(), idField.Interface())
-					} else {
-						// Fallback if fields don't match expected names
-						r.ID = fmt.Sprintf("%v", rowMap["id"])
-					}
-				} else {
-					// Fallback
-					r.ID = fmt.Sprintf("%v", rowMap["id"])
-				}
-			}
+			// Use the shared helper for ID extraction
+			r.ID = extractID(rowMap["id"])
 
 			if uid, ok := rowMap["user_id"].(string); ok {
 				r.UserID = uid
@@ -1170,12 +1142,7 @@ func (s *SurrealStore) GetDueDelayedThoughts() ([]DelayedThought, error) {
 			t := DelayedThought{}
 
 			// Parse ID
-			if id, ok := rowMap["id"].(string); ok {
-				t.ID = id
-			} else {
-				// Handle struct/map ID formats
-				t.ID = fmt.Sprintf("%v", rowMap["id"])
-			}
+			t.ID = extractID(rowMap["id"])
 
 			if uid, ok := rowMap["user_id"].(string); ok {
 				t.UserID = uid
@@ -1257,4 +1224,35 @@ func (s *SurrealStore) DeleteDelayedThought(id string) error {
 		"key": key,
 	})
 	return err
+}
+
+// extractID is a helper to robustly extract Record IDs from SurrealDB responses
+// It handles strings, maps (from JSON), and structs (from driver)
+func extractID(rawID interface{}) string {
+	if id, ok := rawID.(string); ok {
+		return id
+	} else if idMap, ok := rawID.(map[string]interface{}); ok {
+		// Handle RecordID object if returned as map
+		if strID, ok := idMap["String"].(string); ok {
+			return strID
+		} else if table, ok := idMap["Table"].(string); ok {
+			// Handle split Table/ID format
+			if idVal, ok := idMap["ID"].(string); ok {
+				return table + ":" + idVal
+			}
+		}
+	} else {
+		// Check for struct using reflection (common for driver-specific types)
+		val := reflect.ValueOf(rawID)
+		if val.Kind() == reflect.Struct {
+			// Try to get Table and ID fields
+			tableField := val.FieldByName("Table")
+			idField := val.FieldByName("ID")
+			if tableField.IsValid() && idField.IsValid() {
+				return fmt.Sprintf("%v:%v", tableField.Interface(), idField.Interface())
+			}
+		}
+	}
+	// Fallback
+	return fmt.Sprintf("%v", rawID)
 }

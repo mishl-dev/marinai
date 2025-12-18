@@ -1,8 +1,6 @@
 package memory
 
 import (
-	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,40 +13,12 @@ type MockRecordID struct {
 }
 
 func TestIDExtractionWithReflection(t *testing.T) {
-	// Re-implement the extraction logic here for testing purposes,
-	// since the actual logic is embedded in the GetDueReminders method and not exported.
-	// In a real refactor, this logic should be extracted to a helper function.
-
-	extractID := func(row map[string]interface{}) string {
-		if id, ok := row["id"].(string); ok {
-			return id
-		} else if idMap, ok := row["id"].(map[string]interface{}); ok {
-			if strID, ok := idMap["String"].(string); ok {
-				return strID
-			}
-			if table, ok := idMap["Table"].(string); ok {
-				if idVal, ok := idMap["ID"].(string); ok {
-					return table + ":" + idVal
-				}
-			}
-		} else {
-			// Reflection logic matching the implementation in surreal_store.go
-			val := reflect.ValueOf(row["id"])
-			if val.Kind() == reflect.Struct {
-				tableField := val.FieldByName("Table")
-				idField := val.FieldByName("ID")
-				if tableField.IsValid() && idField.IsValid() {
-					return fmt.Sprintf("%v:%v", tableField.Interface(), idField.Interface())
-				}
-			}
-		}
-		// Fallback
-		return fmt.Sprintf("%v", row["id"])
-	}
+	// Use the package-level helper function 'extractID' which is now defined in surreal_store.go
+	// Since we are in the same package (memory), we can access it directly (if unexported).
 
 	// Case 1: ID is a simple string
 	rowStringID := map[string]interface{}{"id": "reminders:123"}
-	assert.Equal(t, "reminders:123", extractID(rowStringID), "Case 1 (String) failed")
+	assert.Equal(t, "reminders:123", extractID(rowStringID["id"]), "Case 1 (String) failed")
 
 	// Case 2: ID is a map (e.g., from JSON unmarshal)
 	rowMapID := map[string]interface{}{
@@ -57,12 +27,27 @@ func TestIDExtractionWithReflection(t *testing.T) {
 			"ID":    "abc",
 		},
 	}
-	assert.Equal(t, "reminders:abc", extractID(rowMapID), "Case 2 (Map) failed")
+	assert.Equal(t, "reminders:abc", extractID(rowMapID["id"]), "Case 2 (Map) failed")
 
 	// Case 3: ID is a struct (SurrealDB driver behavior)
 	mockStruct := MockRecordID{Table: "reminders", ID: "28qa9te5wuz8m1akx1xr"}
 	rowStructID := map[string]interface{}{"id": mockStruct}
 
 	expected := "reminders:28qa9te5wuz8m1akx1xr"
-	assert.Equal(t, expected, extractID(rowStructID), "Case 3 (Struct) failed")
+	assert.Equal(t, expected, extractID(rowStructID["id"]), "Case 3 (Struct) failed")
+
+	// Case 4: Fallback (should at least return string representation)
+	rowIntID := map[string]interface{}{"id": 12345}
+	assert.Equal(t, "12345", extractID(rowIntID["id"]), "Case 4 (Fallback) failed")
+}
+
+// Test extracting from nested map format used by some drivers
+func TestIDExtraction_NestedMap(t *testing.T) {
+	// Format: { "id": { "String": "reminders:123" } }
+	rowNestedString := map[string]interface{}{
+		"id": map[string]interface{}{
+			"String": "reminders:123",
+		},
+	}
+	assert.Equal(t, "reminders:123", extractID(rowNestedString["id"]))
 }
