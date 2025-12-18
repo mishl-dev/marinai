@@ -227,8 +227,8 @@ func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 	}
 }
 
-// handleMoodCommand handles the /mood slash command - shows Marin's current mood
-func handleMoodCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+// buildMoodEmbed creates the mood embed
+func buildMoodEmbed(h *Handler) *discordgo.MessageEmbed {
 	mood, emoji, description := h.GetCurrentMood()
 
 	// Get color for current mood
@@ -244,7 +244,6 @@ func handleMoodCommand(h *Handler, s *discordgo.Session, i *discordgo.Interactio
 		flavorText = "*bounces around excitedly*"
 	case MoodSleepy:
 		flavorText = "*yawns*"
-
 		flavorText += "\n\n" + getSleepTimeRemaining()
 	case MoodFlirty:
 		flavorText = "😏"
@@ -261,17 +260,41 @@ func handleMoodCommand(h *Handler, s *discordgo.Session, i *discordgo.Interactio
 		Title:       fmt.Sprintf("%s Current Mood: %s", emoji, mood),
 		Description: description,
 		Color:       color,
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: "Last updated: " + time.Now().Format("3:04 PM"),
+		},
 	}
 
 	if flavorText != "" {
 		embed.Description += "\n\n" + flavorText
 	}
 
+	return embed
+}
+
+// handleMoodCommand handles the /mood slash command - shows Marin's current mood
+func handleMoodCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+	embed := buildMoodEmbed(h)
+
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Embeds: []*discordgo.MessageEmbed{embed},
 			Flags:  discordgo.MessageFlagsEphemeral,
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{
+							Label:    "Refresh",
+							Style:    discordgo.SecondaryButton,
+							CustomID: "mood_refresh",
+							Emoji: &discordgo.ComponentEmoji{
+								Name: "🔄",
+							},
+						},
+					},
+				},
+			},
 		},
 	})
 
@@ -280,28 +303,38 @@ func handleMoodCommand(h *Handler, s *discordgo.Session, i *discordgo.Interactio
 	}
 }
 
-// handleAffectionCommand handles the /affection slash command - shows relationship status
-func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
-	// Get user ID
-	var userID string
-	var userName string
-	if i.Member != nil {
-		userID = i.Member.User.ID
-		userName = i.Member.User.Username
-		if i.Member.User.GlobalName != "" {
-			userName = i.Member.User.GlobalName
-		}
-	} else if i.User != nil {
-		userID = i.User.ID
-		userName = i.User.Username
-		if i.User.GlobalName != "" {
-			userName = i.User.GlobalName
-		}
-	} else {
-		log.Printf("Error: Could not determine user ID for affection command")
-		return
-	}
+// handleMoodRefresh handles the refresh button for the mood command
+func handleMoodRefresh(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+	embed := buildMoodEmbed(h)
 
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseUpdateMessage,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{embed},
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{
+							Label:    "Refresh",
+							Style:    discordgo.SecondaryButton,
+							CustomID: "mood_refresh",
+							Emoji: &discordgo.ComponentEmoji{
+								Name: "🔄",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	if err != nil {
+		log.Printf("Error responding to mood refresh: %v", err)
+	}
+}
+
+// buildAffectionEmbed creates the affection embed for a user
+func buildAffectionEmbed(h *Handler, userID, userName string) *discordgo.MessageEmbed {
 	affection, level := h.GetUserAffection(userID)
 	streak, _ := h.memoryStore.GetStreak(userID)
 
@@ -344,18 +377,111 @@ func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.Inter
 				Inline: false,
 			},
 		},
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: "Last updated: " + time.Now().Format("3:04 PM"),
+		},
 	}
+	return embed
+}
+
+// handleAffectionCommand handles the /affection slash command - shows relationship status
+func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+	// Get user ID
+	var userID string
+	var userName string
+	if i.Member != nil {
+		userID = i.Member.User.ID
+		userName = i.Member.User.Username
+		if i.Member.User.GlobalName != "" {
+			userName = i.Member.User.GlobalName
+		}
+	} else if i.User != nil {
+		userID = i.User.ID
+		userName = i.User.Username
+		if i.User.GlobalName != "" {
+			userName = i.User.GlobalName
+		}
+	} else {
+		log.Printf("Error: Could not determine user ID for affection command")
+		return
+	}
+
+	embed := buildAffectionEmbed(h, userID, userName)
 
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Embeds: []*discordgo.MessageEmbed{embed},
 			Flags:  discordgo.MessageFlagsEphemeral,
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{
+							Label:    "Refresh",
+							Style:    discordgo.SecondaryButton,
+							CustomID: "affection_refresh",
+							Emoji: &discordgo.ComponentEmoji{
+								Name: "🔄",
+							},
+						},
+					},
+				},
+			},
 		},
 	})
 
 	if err != nil {
 		log.Printf("Error responding to affection command: %v", err)
+	}
+}
+
+// handleAffectionRefresh handles the refresh button for the affection command
+func handleAffectionRefresh(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+	// Get user ID
+	var userID string
+	var userName string
+	if i.Member != nil {
+		userID = i.Member.User.ID
+		userName = i.Member.User.Username
+		if i.Member.User.GlobalName != "" {
+			userName = i.Member.User.GlobalName
+		}
+	} else if i.User != nil {
+		userID = i.User.ID
+		userName = i.User.Username
+		if i.User.GlobalName != "" {
+			userName = i.User.GlobalName
+		}
+	} else {
+		log.Printf("Error: Could not determine user ID for affection refresh")
+		return
+	}
+
+	embed := buildAffectionEmbed(h, userID, userName)
+
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseUpdateMessage,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{embed},
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{
+							Label:    "Refresh",
+							Style:    discordgo.SecondaryButton,
+							CustomID: "affection_refresh",
+							Emoji: &discordgo.ComponentEmoji{
+								Name: "🔄",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	if err != nil {
+		log.Printf("Error responding to affection refresh: %v", err)
 	}
 }
 
@@ -379,6 +505,10 @@ func (h *Handler) InteractionCreate(s *discordgo.Session, i *discordgo.Interacti
 			handleResetConfirm(h, s, i)
 		case "reset_cancel":
 			handleResetCancel(h, s, i)
+		case "mood_refresh":
+			handleMoodRefresh(h, s, i)
+		case "affection_refresh":
+			handleAffectionRefresh(h, s, i)
 		}
 		return
 	}
