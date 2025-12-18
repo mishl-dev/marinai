@@ -220,7 +220,7 @@ var ProactiveThoughtMessagesHighAffection = []string{
 	"everything reminds me of you lately",
 	"hey you. yeah you. i like you. a lot. okay bye.",
 	"just wanted to tell you youre important to me",
-	"i had a dream about you... it was nice 💕",
+	"i had a dream about you... it was nice",
 }
 
 // runProactiveThoughtsLoop periodically sends proactive thoughts to close friends
@@ -364,11 +364,16 @@ Things you know about them:
 Write a very short, casual message (1-2 sentences max) to send them. It should feel spontaneous and genuine.
 
 Rules:
-- Be casual, lowercase, natural texting style
-- Reference what you're currently doing or thinking about
-- Could reference something you know about them, or ask how something they mentioned is going
-- Should feel like you just randomly thought of them
-- No roleplay actions like *does something*
+- EXTREMELY SHORT messages (1-2 sentences MAX).
+- mostly lowercase, casual typing.
+- ABSOLUTELY NO EMOJIS OR EMOTICONS. Express yourself with words only.
+- NO ROLEPLAY (*actions*). This is text, not a roleplay server.
+- NEVER start a message with "Oh,", "Ah,", or "Hmm,".
+- NEVER use asterisks for actions.
+- Sound natural, like a real text message.
+- Reference what you're currently doing or thinking about.
+- Could reference something you know about them, or ask how something they mentioned is going.
+- Should feel like you just randomly thought of them.
 
 Just output the message, nothing else.`, h.GetStateForPrompt(), level.Emoji, level.Name, profileText)
 

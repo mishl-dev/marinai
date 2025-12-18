@@ -267,12 +267,15 @@ Now you want to add something to the conversation - maybe you:
 Write a SHORT message (1-2 sentences) that feels like you're coming back to continue the conversation naturally.
 
 Rules:
-- Be casual, lowercase, natural texting style
-- Reference the previous conversation but don't repeat it verbatim
-- Could be a follow-up question, an afterthought, or just continuing the vibe
-- Make it feel spontaneous, like "oh wait I just thought of something"
-- No roleplay actions like *does something*
-- Match your energy to the relationship level
+- EXTREMELY SHORT messages (1-2 sentences MAX).
+- mostly lowercase, casual typing.
+- ABSOLUTELY NO EMOJIS OR EMOTICONS. Express yourself with words only.
+- NO ROLEPLAY (*actions*). This is text, not a roleplay server.
+- NEVER start a message with "Oh,", "Ah,", or "Hmm,".
+- Be natural, like a real text message.
+- Reference the previous conversation but don't repeat it verbatim.
+- Could be a follow-up question, an afterthought, or just continuing the vibe.
+- Match your energy to the relationship level.
 
 Just output the message, nothing else.`,
 		userName, timeContext, level.Emoji, level.Name,

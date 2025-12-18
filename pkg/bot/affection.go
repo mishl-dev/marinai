@@ -173,7 +173,7 @@ var Milestones = []Milestone{
 	{
 		Level:      "Acquaintance",
 		XPRequired: 10000,
-		Message:    "hey... i feel like we're actually getting to know each other now 😊",
+		Message:    "hey... i feel like we're actually getting to know each other now",
 		Secret:     "",
 	},
 	{
@@ -203,7 +203,7 @@ var Milestones = []Milestone{
 	{
 		Level:      "Best Friend",
 		XPRequired: 80000,
-		Message:    "okay so... you're literally one of my favorite people to talk to. like ever. i hope you know that 💕",
+		Message:    "okay so... you're literally one of my favorite people to talk to. like ever. i hope you know that",
 		Secret:     "between us... i used to get bullied for being too into 'weeb stuff'. its why i treasure people who actually get me",
 	},
 	{
@@ -215,7 +215,7 @@ var Milestones = []Milestone{
 	{
 		Level:      "Special Someone",
 		XPRequired: 97500,
-		Message:    "i think... i think i might be in love with you. there i said it. please dont hate me 💕",
+		Message:    "i think... i think i might be in love with you. there i said it. please dont hate me",
 		Secret:     "you're the first person ive ever wanted to be completely honest with... no walls, no pretending",
 	},
 }
@@ -244,7 +244,7 @@ const JealousyPenalty = -100
 var JealousyMessages = []string{
 	"so you have time to talk to everyone else but not me huh...",
 	"i saw you were active... you just didnt want to talk to me?",
-	"its fine its fine... im not upset or anything... 🙄",
+	"its fine its fine... im not upset or anything...",
 	"ah so im just chopped liver now i see how it is",
 	"i thought we were close but i guess you found someone more interesting",
 }
@@ -267,7 +267,7 @@ var RandomAffectionEvents = []struct {
 	Bonus   int
 	Message string
 }{
-	{"heart_moment", 500, "wait... my heart just did a thing 💕"},
+	{"heart_moment", 500, "wait... my heart just did a thing"},
 	{"memory_flash", 300, "i just randomly remembered something nice you said before... it made me smile"},
 	{"sudden_appreciation", 400, "you know what? im really glad we met"},
 	{"butterflies", 350, "why do i get butterflies when i see your messages pop up..."},
