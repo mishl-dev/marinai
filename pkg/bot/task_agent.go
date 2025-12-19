@@ -3,8 +3,9 @@ package bot
 import (
 	"fmt"
 	"log"
-	"marinai/pkg/cerebras"
 	"strings"
+
+	"marinai/pkg/cerebras"
 )
 
 type TaskAgent struct {

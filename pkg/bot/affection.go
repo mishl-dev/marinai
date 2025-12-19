@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"marinai/pkg/cerebras"
 	"math/rand"
 	"strings"
 	"time"
+
+	"marinai/pkg/cerebras"
 )
 
 // ==========================================

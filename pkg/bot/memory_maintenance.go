@@ -2,8 +2,9 @@ package bot
 
 import (
 	"log"
-	"marinai/pkg/memory"
 	"time"
+
+	"marinai/pkg/memory"
 )
 
 // maintainMemories runs periodically to age facts and trigger summarization

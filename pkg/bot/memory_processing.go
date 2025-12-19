@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"marinai/pkg/cerebras"
-	"marinai/pkg/memory"
 	"strings"
 	"time"
+
+	"marinai/pkg/cerebras"
+	"marinai/pkg/memory"
 )
 
 func (h *Handler) addRecentMessage(userID, role, message string) {

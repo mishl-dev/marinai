@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"marinai/pkg/cerebras"
 	"strings"
 	"time"
+
+	"marinai/pkg/cerebras"
 )
 
 // GetFactsWithTimestamps returns facts with their creation timestamps

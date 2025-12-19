@@ -18,7 +18,13 @@ func TestExtractMemories(t *testing.T) {
 	mockGemini := &MockGeminiClient{}
 
 	// Create handler
-	h := NewHandler(mockCerebras, mockEmbedding, mockGemini, mockMemory, 0, 7, 20, 24)
+	cfg := HandlerConfig{
+		MessageProcessingDelay:     0,
+		FactAgingDays:              7,
+		FactSummarizationThreshold: 20,
+		MaintenanceIntervalHours:   24,
+	}
+	h := NewHandler(mockCerebras, mockEmbedding, mockGemini, mockMemory, cfg)
 
 	// Test data
 	userID := "user123"
@@ -148,7 +154,13 @@ func TestExtractMemories_ShortMessage(t *testing.T) {
 	mockEmbedding := &mockEmbeddingClient{}
 	mockGemini := &MockGeminiClient{}
 
-	h := NewHandler(mockCerebras, mockEmbedding, mockGemini, mockMemory, 0, 7, 20, 24)
+	cfg := HandlerConfig{
+		MessageProcessingDelay:     0,
+		FactAgingDays:              7,
+		FactSummarizationThreshold: 20,
+		MaintenanceIntervalHours:   24,
+	}
+	h := NewHandler(mockCerebras, mockEmbedding, mockGemini, mockMemory, cfg)
 
 	// Spy
 	chatCompletionCalled := false

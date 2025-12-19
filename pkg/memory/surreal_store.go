@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"marinai/pkg/surreal"
 	"reflect"
 	"strings"
 	"time"
+
+	"marinai/pkg/surreal"
 )
 
 type SurrealStore struct {
