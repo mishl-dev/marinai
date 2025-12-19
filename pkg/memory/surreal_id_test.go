@@ -1,8 +1,6 @@
 package memory
 
 import (
-	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,36 +13,8 @@ type MockRecordID struct {
 }
 
 func TestIDExtractionWithReflection(t *testing.T) {
-	// Re-implement the extraction logic here for testing purposes,
-	// since the actual logic is embedded in the GetDueReminders method and not exported.
-	// In a real refactor, this logic should be extracted to a helper function.
-
-	extractID := func(row map[string]interface{}) string {
-		if id, ok := row["id"].(string); ok {
-			return id
-		} else if idMap, ok := row["id"].(map[string]interface{}); ok {
-			if strID, ok := idMap["String"].(string); ok {
-				return strID
-			}
-			if table, ok := idMap["Table"].(string); ok {
-				if idVal, ok := idMap["ID"].(string); ok {
-					return table + ":" + idVal
-				}
-			}
-		} else {
-			// Reflection logic matching the implementation in surreal_store.go
-			val := reflect.ValueOf(row["id"])
-			if val.Kind() == reflect.Struct {
-				tableField := val.FieldByName("Table")
-				idField := val.FieldByName("ID")
-				if tableField.IsValid() && idField.IsValid() {
-					return fmt.Sprintf("%v:%v", tableField.Interface(), idField.Interface())
-				}
-			}
-		}
-		// Fallback
-		return fmt.Sprintf("%v", row["id"])
-	}
+	// We now test the internal helper function `extractID` directly.
+	// Note: Since we are in package `memory`, we can access unexported functions.
 
 	// Case 1: ID is a simple string
 	rowStringID := map[string]interface{}{"id": "reminders:123"}
