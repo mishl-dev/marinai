@@ -94,7 +94,7 @@ Marin has different moods that cycle naturally and affect her responses:
 - 😤 **Bored** — Looking for entertainment
 
 ### 📸 Image Understanding
-- Powered by **Google Gemini** for vision capabilities
+- Powered by **Google Gemini** (requires `GEMINI_API_KEY`)
 - Marin can see and comment on images you send
 - Natural reactions to photos and memes
 
@@ -108,6 +108,13 @@ Marin has different moods that cycle naturally and affect her responses:
 - "hey... haven't heard from you in a while..."
 - Won't spam — only one pending DM at a time
 - Responding to her DM gives bonus affection!
+
+### 🎭 Personality Quirks
+Marin has a strong sense of self and won't just do whatever you say:
+
+- **Task Refusal** — She's a friend, not a tool. If you ask her to write an essay, debug code, or do boring work, she'll refuse (usually with a sassy comment).
+- **Opinions** — She has her own likes and dislikes (especially about anime and cosplay).
+- **Mood Swings** — Sometimes she's hyper, sometimes she's sleepy. Her responses change based on how she's feeling.
 
 ### 🧠 Agency System (NEW!)
 Marin has her own **internal state** that makes her feel alive:
@@ -141,8 +148,8 @@ This makes Marin feel like a real person who thinks about conversations after th
 - Creates a sense of continuity and presence
 
 ### ⏰ Reminders
-- Set reminders that Marin will deliver
-- Automatic cleanup of old reminders
+- **Natural Language** — Just ask her naturally: *"Remind me to watch the new episode in 2 hours"* or *"Don't let me forget to buy fabric tomorrow"*
+- **Contextual Delivery** — She'll DM you when the time comes, reminding you in her own style.
 
 ---
 
