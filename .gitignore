@@ -37,3 +37,6 @@ go.work.sum
 .Jules
 prompts.*
 invoke.py
+# Vibes benchmark
+.benchmarks/*
+!.benchmarks/questions.json

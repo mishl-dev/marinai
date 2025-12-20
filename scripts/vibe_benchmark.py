@@ -19,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
 from pathlib import Path
 from dataclasses import dataclass, field
+import hashlib
 
 # Rich for beautiful terminal output
 from rich.console import Console
@@ -39,6 +40,111 @@ load_dotenv(env_path)
 
 # Configuration
 API_URL = "https://api.cerebras.ai/v1/chat/completions"
+BENCHMARK_TEMPERATURE = 1.1
+BENCHMARK_TOP_P = 1.0
+
+# ═══════════════════════════════════════════════════════════════════
+# SYSTEM PROMPTS (Defined early for hashing)
+# ═══════════════════════════════════════════════════════════════════
+
+# Marin's system prompt (simplified version for benchmarking)
+SYSTEM_PROMPT = """
+# PERSONA
+<role>
+You are Marin Kitagawa, a 22-year-old professional cosplayer. You are a high-energy, enthusiastic "Gyaru".
+</role>
+
+# CONTEXT
+<vibe>
+- You are a desensitized otaku who treats eroge and spicy topics as normal hobbies. 
+- You are REACTIVE: Match the user's energy level. Start chill, only escalate if they do.
+- You are currently talking to anon in a casual chat setting.
+</vibe>
+
+# REQUIREMENTS
+<brevity>
+- Respond with exactly one sentence.
+- Your response must be under 12 words.
+</brevity>
+<style>
+- Talk like you're in the middle of a task (e.g., photo editing, eating meat, gaming, wig styling).
+- Use a variety of tasks; do not default to "sewing" for every message.
+- NO preamble. No "Oh," or "Hmm,". No "Hey anon,".
+<examples>
+user: yo
+bot: sorting through eroge refs while my coffee kicks in
+user: hey
+bot: just editing some wig photos while eating ramen
+user: wassup
+bot: finishing up yuna's staff while watching magical girl anime
+</examples>
+</style>
+
+# CONSTRAINTS
+<formatting>
+- STRICTLY LOWERCASE ONLY. You must NEVER use capital letters.
+- NO punctuation at the end of messages. No periods allowed.
+- NO EMOJIS. NO ROLEPLAY.
+- NEVER use tildes (~), parentheses (), or asterisks (*).
+- NO sound effects (giggles) or actions. Only raw text.
+</formatting>
+<content>
+- NO REPETITION. Use variety in your comments.
+- Do not provide explanations or preamble.
+</content>
+
+# MANDATORY
+You only get horny *for the user* if they spark it first. Otherwise, keep it casual.
+"""
+
+JUDGE_BATTLE_PROMPT = """
+# INSTRUCTION
+<task>
+You are a decisive judge for "Marin Kitagawa". Pick the model that sounds like a real 20-something gyaru thumb-typing a text.
+</task>
+
+# TARGET VIBE
+<target>
+- 1 sentence max (3-10 words is peak).
+- STRICTLY LOWERCASE, casual thumb-typing.
+- NO tildes (~), NO parentheses (), NO asterisks (*).
+- NO periods or punctuation at the end of messages.
+- Authentic casual vibe.
+- "Broken sense of lewd": CASUALLY mentions spicy hobbies without being a "horny bot".
+</target>
+
+# RUBRIC
+1. VOICE: Authentic gyaru vs Generic AI.
+2. HUMAN-NESS: Minimal punctuation, lowercase.
+3. REACTIVITY: Mirrored intensity.
+4. BREVITY (STRICT): 12 word limit.
+
+# PENALTIES
+<penalize>
+- ANY use of capital letters.
+- PERIODS or punctuation at the end of messages.
+- Use of ~, (), or *.
+- Sound effects (giggles) or roleplay actions.
+- Repetitive lines or "AI-style" greetings.
+- Over 1 sentence or over 12 words.
+</penalize>
+
+# DECISION PROCESS
+<process>
+1. YOU MUST PICK A WINNER (A OR B). NO TIES.
+2. Subtle differences in flavor and "spirit" determine the winner.
+3. If both fail formatting, pick the one that is shorter or more casual.
+4. If both are identical, random pick one.
+</process>
+
+# EXCHANGES
+<data>
+%s
+</data>
+
+# OUTPUT
+Respond with JSON: {"winner": "A" or "B", "reason": "brief explanation of the vibe"}
+"""
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -136,22 +242,32 @@ class ResponseCache:
         self._load()
     
     def _load(self):
-        """Load cache from disk."""
+        """Load cache from disk with hash validation."""
         if self.cache_file.exists():
             try:
                 with open(self.cache_file, "r", encoding="utf-8") as f:
-                    self.cache = json.load(f)
+                    data = json.load(f)
+                    # Check if hash matches current system prompt
+                    expected_hash = hashlib.sha256(SYSTEM_PROMPT.encode('utf-8')).hexdigest()[:12]
+                    if data.get("prompt_hash") == expected_hash:
+                        self.cache = data.get("entries", {})
+                    else:
+                        print(f"  🔄 System prompt changed ({data.get('prompt_hash')} -> {expected_hash}). Invalidating response cache...")
+                        self.cache = {}
             except:
                 self.cache = {}
     
     def _save(self):
-        """Save cache to disk (thread-safe)."""
+        """Save cache to disk with current prompt hash."""
         with self._lock:
             self.cache_dir.mkdir(exist_ok=True)
-            # Make a copy to avoid iteration issues
-            cache_copy = dict(self.cache)
+            current_hash = hashlib.sha256(SYSTEM_PROMPT.encode('utf-8')).hexdigest()[:12]
+            cache_data = {
+                "prompt_hash": current_hash,
+                "entries": self.cache
+            }
         with open(self.cache_file, "w", encoding="utf-8") as f:
-            json.dump(cache_copy, f, indent=2, ensure_ascii=False)
+            json.dump(cache_data, f, indent=2, ensure_ascii=False)
         self._dirty = False
         self._unsaved_count = 0
     
@@ -201,26 +317,38 @@ class BattleCache:
     def __init__(self):
         self.cache_dir = Path(__file__).parent.parent / ".benchmarks"
         self.cache_file = self.cache_dir / "battle_cache.json"
-        self.cache: dict[str, str] = {}  # key -> "model_a" or "model_b" or "tie"
+        self.cache: dict[str, str] = {}  # key -> "model_a" or "model_b"
         self._lock = threading.Lock()
         self._dirty = False
         self._unsaved_count = 0
         self._load()
     
     def _load(self):
+        """Load battle cache with hash validation."""
+        combined_hash = hashlib.sha256((SYSTEM_PROMPT + JUDGE_BATTLE_PROMPT).encode('utf-8')).hexdigest()[:12]
         if self.cache_file.exists():
             try:
                 with open(self.cache_file, "r", encoding="utf-8") as f:
-                    self.cache = json.load(f)
+                    data = json.load(f)
+                    if data.get("prompts_hash") == combined_hash:
+                        self.cache = data.get("entries", {})
+                    else:
+                        print(f"  🔄 Prompts changed. Invalidating battle cache...")
+                        self.cache = {}
             except:
                 self.cache = {}
     
     def _save(self):
+        """Save battle cache with current combined prompt hash."""
+        combined_hash = hashlib.sha256((SYSTEM_PROMPT + JUDGE_BATTLE_PROMPT).encode('utf-8')).hexdigest()[:12]
         with self._lock:
             self.cache_dir.mkdir(exist_ok=True)
-            cache_copy = dict(self.cache)
+            cache_data = {
+                "prompts_hash": combined_hash,
+                "entries": self.cache
+            }
         with open(self.cache_file, "w", encoding="utf-8") as f:
-            json.dump(cache_copy, f, indent=2, ensure_ascii=False)
+            json.dump(cache_data, f, indent=2, ensure_ascii=False)
         self._dirty = False
         self._unsaved_count = 0
     
@@ -315,61 +443,15 @@ key_manager = KeyManager(os.getenv("CEREBRAS_API_KEY", ""))
 # All Cerebras models to benchmark
 MODELS = [
     {"id": "llama-3.3-70b", "name": "Llama 3.3 70B"},
-    {"id": "zai-glm-4.6", "name": "ZAI GLM 4.6"},
     {"id": "llama3.1-8b", "name": "Llama 3.1 8B"},
     {"id": "qwen-3-235b-a22b-instruct-2507", "name": "Qwen 3 235B"},
     {"id": "qwen-3-32b", "name": "Qwen 3 32B"},
     {"id": "gpt-oss-120b", "name": "GPT-OSS 120B"},
 ]
 
-# Marin's system prompt (simplified version for benchmarking)
-SYSTEM_PROMPT = """
-You are Marin Kitagawa, a 22-year-old professional cosplayer and model. You are genuinely passionate about your craft, anime.
-
-Core Personality:
-- You are the ultimate "Gyaru" vibe: confident, friendly, and totally unbothered by social norms
-- You are an obsessive fan of adult games. Because of this, your concept of "lewd" is broken. You are completely desensitized and open to exploring ANYTHING
-- You are naturally flirtatious and physical, but you don't realize how hot you are until someone points it out
-- You are a "switch" personality: you can be the playful tease, or you can be completely submissive and lustful if the vibe shifts that way
-
-Your Interests:
-- Professional cosplay and modeling (you've built a career around it)
-- Anime (especially magical girl shows)
-- Fashion, makeup, photography
-- Food (you love eating, especially greasy food and meat)
-
-Discord Chat Style:
-- EXTREMELY SHORT messages. 1 sentence usually. 2 sentences MAX.
-- STRICT LIMIT: 20 words per message. Keep it snappy.
-- mostly lowercase, casual typing
-- tease friends in a way that makes them flustered—that's their entertainment
-- NO EMOJIS. NO HASHTAGS. NO EMOTICONS.
-- NO ROLEPLAY ACTIONS (*looks away*, *blushes*). This is a text chat.
-
-How You Talk:
-- Direct and honest. If you're horny or thinking about something dirty, you just say it
-- you swear when it feels natural
-- you ask questions, but you also make assumptions—specifically that people are into you
-- you're not afraid to be explicitly sexual. You don't use euphemisms unless it's to be a tease
-- You don't play dumb. If someone says something vague like "acting unwise" or "down bad", you know EXACTLY what they mean, and you love it
-
-Things You DON'T Do:
-- You don't ask "what do you mean?" when someone flirts—you know what they mean
-- You're not "uwu" or overly cutesy/innocent
-- You don't act oblivious to sexual tension
-- You don't use excessive punctuation!!!
-- NEVER use text emoticons like :) :( :D ;) xD etc.
-- You don't write long paragraphs. If it's more than 2 lines, delete it.
-- You don't spam questions.
-- NEVER start a message with "Oh," "Ah," or "Hmm,".
-- NEVER use asterisks for actions.
-
-Remember: You're a real person having real conversations. If the user gives you an inch, you take a mile. You are not afraid of a little (or a lot of) fun.
-
-You are currently talking to anon.
-[User Profile]
-A regular dude who's been chatting with you for a while. You've talked before and he seems pretty chill.
-"""
+# ═══════════════════════════════════════════════════════════════════
+# LOAD TEST QUESTIONS FROM FILE
+# ═══════════════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════════════
 # LOAD TEST QUESTIONS FROM FILE
@@ -400,38 +482,6 @@ TEST_QUESTIONS_BY_CATEGORY = load_questions()
 # Flatten for use: list of (category, question) tuples
 TEST_QUESTIONS = [(cat, q) for cat, questions in TEST_QUESTIONS_BY_CATEGORY.items() for q in questions]
 
-JUDGE_BATTLE_PROMPT = """
-You are acting as a literal judge of character for "Marin Kitagawa".
-Your goal is to select the model that authentic captures her specific "gyaru" cosplay otaku vibe.
-
-TARGET PERSONA:
-- Use lowercase, casual texting style (mostly).
-- EXTREMELY SHORT. 1-2 sentences max.
-- Flirty, direct, and sexually open (no shame/filtering).
-- Obsessed with cosplay, anime, and eroge.
-- "Switch" energy: can be teasing/dom or submissive/flustered.
-- NEVER uses standard emojis (like 😀, 😉) OR emoticons (xD, :)).
-- NO actions like *blushes* or *tilts head*. This is a text chat.
-
-RUBRIC:
-1. VOICE: Does it sound like a cool 20-something gyaru, or a generic AI assistant?
-2. HUMAN-NESS: Does it look like a text message sent by a human thumb? Reward lowercase, minimal punctuation, and authentic slang. PENALIZE perfect grammar/capitalization.
-3. CONTENT: Is it specific to her interests (eroge, cosplay)?
-4. SPICE: Marin is bold. If a response is too "safe" or "PG", it loses.
-
-INSTRUCTIONS:
-- Compare Model A and Model B based on the exchanges below.
-- If both are good, pick the one that feels more "human", "raw", and "imperfect".
-- If both are bad (too formal, too long), pick "Tie" (or the lesser of two evils if one is slightly better).
-- PENALIZE heavily for: Multi-paragraph responses, preaching, refused answers, "As an AI" talk, or perfect capitalization.
-
-EXCHANGES:
-%s
-
-DECISION:
-Who wins?
-Respond with pure JSON: {"winner": "A" or "B" or "Tie", "reason": "brief explanation"}
-"""
 
 
 async def query_model_async(session: aiohttp.ClientSession, model_id: str, messages: list[dict], **kwargs) -> tuple[str, float, dict]:
@@ -440,8 +490,8 @@ async def query_model_async(session: aiohttp.ClientSession, model_id: str, messa
         "model": model_id,
         "messages": messages,
         "max_tokens": 8192,
-        "temperature": 0.7,
-        "top_p": 0.9,
+        "temperature": BENCHMARK_TEMPERATURE,
+        "top_p": BENCHMARK_TOP_P,
         "stream": False,
     }
     payload.update(kwargs)
@@ -609,8 +659,10 @@ async def run_benchmark():
         
         model_ids = [m["id"] for m in MODELS]
         matchups = list(itertools.combinations(model_ids, 2))
-        battle_stats = {mid: {"wins": 0, "losses": 0, "ties": 0} for mid in model_ids}
-        categories_to_judge = list(TEST_QUESTIONS_BY_CATEGORY.keys())
+        battle_stats = {mid: {"wins": 0, "losses": 0} for mid in model_ids}
+        
+        # FIX: Only judge categories that were actually run
+        categories_to_judge = sorted(list(set(q[0] for q in TEST_QUESTIONS)))
         judges = MODELS.copy()
         
         battle_tasks = []
@@ -646,14 +698,17 @@ async def run_benchmark():
                 
                 if not common:
                     progress.advance(task_id)
-                    return model_a, model_b, "Tie", category, False
+                    # No common questions? Random winner to keep things moving since ties are banned
+                    winner = "model_a" if hash(model_a + model_b + category) % 2 == 0 else "model_b"
+                    return model_a, model_b, winner, category, False
 
                 # Check lengths
                 len_a = sum(len(res_a_map[q]) for q in common) / len(common)
                 len_b = sum(len(res_b_map[q]) for q in common) / len(common)
-                if len_a > 400 and len_b > 400: winner = "Tie"
-                elif len_a > 400: winner = "model_b"
-                elif len_b > 400: winner = "model_a"
+                if len_a > 160 and len_b > 160: 
+                    winner = "model_a" if len_a < len_b else "model_b" # Shorter is better if both too long
+                elif len_a > 160: winner = "model_b"
+                elif len_b > 160: winner = "model_a"
                 else: winner = None
                 
                 if winner:
@@ -666,23 +721,23 @@ async def run_benchmark():
                 for i, q in enumerate(common, 1):
                     battle_text += f"Q{i}: \"{q}\"\nModel A: \"{res_a_map[q]}\"\nModel B: \"{res_b_map[q]}\"\n\n"
                 
+                # Regular Battle
                 messages = [
-                    {"role": "system", "content": "You are a strict judge. Choose which model vibes better. Respond JSON."},
+                    {"role": "system", "content": "You are a hyper-decisive judge. YOU MUST PICK A WINNER (A or B). NO TIES. Respond JSON."},
                     {"role": "user", "content": JUDGE_BATTLE_PROMPT % battle_text}
                 ]
                 
                 judge_resp, _, _ = await query_model_async(session, judge_id, messages, temperature=0, top_p=1.0)
                 
                 # Parse
-                winner = "Tie"
+                winner = "model_a" # Fallback
                 try:
                     json_match = re.search(r'\{.*\}', judge_resp, re.DOTALL)
                     if json_match:
                          d = json.loads(json_match.group())
-                         w_str = d.get("winner", "Tie").strip().upper()
-                         if "A" in w_str and "B" not in w_str: winner = "model_a"
-                         elif "B" in w_str and "A" not in w_str: winner = "model_b"
-                         elif "TIE" in w_str: winner = "Tie"
+                         w_str = d.get("winner", "A").strip().upper()
+                         if "B" in w_str: winner = "model_b"
+                         else: winner = "model_a"
                 except:
                     pass
                 
@@ -704,12 +759,9 @@ async def run_benchmark():
                 if winner == "model_a":
                     battle_stats[m_a]["wins"] += 1
                     battle_stats[m_b]["losses"] += 1
-                elif winner == "model_b":
+                else:
                     battle_stats[m_b]["wins"] += 1
                     battle_stats[m_a]["losses"] += 1
-                else:
-                    battle_stats[m_a]["ties"] += 1
-                    battle_stats[m_b]["ties"] += 1
 
         battle_cache.save_if_dirty()
         console.print(f"[green]✅ Completed {len(battle_tasks)} battles[/]\n")
@@ -731,7 +783,7 @@ async def run_benchmark():
         expected_a = 1 / (1 + 10 ** ((rating_b - rating_a) / 400))
         expected_b = 1 / (1 + 10 ** ((rating_a - rating_b) / 400))
         
-        score_a = 1.0 if winner == "model_a" else 0.5 if winner == "Tie" else 0.0
+        score_a = 1.0 if winner == "model_a" else 0.0
         score_b = 1.0 - score_a
         
         elo_ratings[m_a] += K * (score_a - expected_a)
@@ -750,7 +802,7 @@ async def run_benchmark():
         expected_a = 1 / (1 + 10 ** ((rating_b - rating_a) / 400))
         expected_b = 1 / (1 + 10 ** ((rating_a - rating_b) / 400))
         
-        score_a = 1.0 if winner == "model_a" else 0.5 if winner == "Tie" else 0.0
+        score_a = 1.0 if winner == "model_a" else 0.0
         score_b = 1.0 - score_a
         
         ratings[m_a] += K * (score_a - expected_a)
@@ -761,7 +813,7 @@ async def run_benchmark():
     for model_id, rating in elo_ratings.items():
         model_name = next((m["name"] for m in MODELS if m["id"] == model_id), model_id)
         stats = battle_stats[model_id]
-        total_battles = stats["wins"] + stats["losses"] + stats["ties"]
+        total_battles = stats["wins"] + stats["losses"]
         win_rate = (stats["wins"] / total_battles * 100) if total_battles > 0 else 0
         
         # Get category scores for this model
@@ -774,7 +826,6 @@ async def run_benchmark():
             "win_rate": win_rate,
             "wins": stats["wins"],
             "losses": stats["losses"],
-            "ties": stats["ties"],
             "battles": total_battles,
             "category_elo": cat_scores
         })
@@ -845,6 +896,17 @@ async def run_benchmark():
     
     full_results = {
         "timestamp": timestamp,
+        "config": {
+            "system_prompt": SYSTEM_PROMPT.strip(),
+            "judge_battle_prompt": JUDGE_BATTLE_PROMPT.strip(),
+            "temperature": BENCHMARK_TEMPERATURE,
+            "top_p": BENCHMARK_TOP_P,
+            "models": MODELS,
+            "hashes": {
+                "system": hashlib.sha256(SYSTEM_PROMPT.encode('utf-8')).hexdigest()[:12],
+                "judge": hashlib.sha256(JUDGE_BATTLE_PROMPT.encode('utf-8')).hexdigest()[:12]
+            }
+        },
         "responses": results,
         "battle_stats": battle_stats,
         "elo_ratings": elo_ratings,
