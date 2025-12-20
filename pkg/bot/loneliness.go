@@ -52,14 +52,14 @@ func (h *Handler) performLonelinessCheck() bool {
 	}
 
 	if h.session == nil {
-		log.Println("Session not set, skipping loneliness check")
+		log.Println("[Loneliness] Session not set, skipping loneliness check")
 		return false
 	}
 
 	// 2. Get all known users
 	users, err := h.memoryStore.GetAllKnownUsers()
 	if err != nil {
-		log.Printf("Error getting known users: %v", err)
+		log.Printf("[Loneliness] Error getting known users: %v", err)
 		return false
 	}
 
@@ -73,14 +73,14 @@ func (h *Handler) performLonelinessCheck() bool {
 		// Check pending DM info for exponential backoff
 		sentAt, dmCount, hasPending, err := h.memoryStore.GetPendingDMInfo(userID)
 		if err != nil {
-			log.Printf("Error checking pending DM for %s: %v", userID, err)
+			log.Printf("[Loneliness] Error checking pending DM for %s: %v", userID, err)
 			continue
 		}
 
 		if hasPending {
 			// Cap at 4 DMs - after that, stop trying until user responds
 			if dmCount >= 4 {
-				log.Printf("User %s: max DMs reached (%d), giving up until they respond", userID, dmCount)
+				log.Printf("[Loneliness] User %s: max DMs reached (%d), giving up until they respond", userID, dmCount)
 				continue
 			}
 
@@ -90,18 +90,18 @@ func (h *Handler) performLonelinessCheck() bool {
 
 			if timeSinceDM < backoffDuration {
 				// Not enough time has passed, skip this user
-				log.Printf("User %s: backoff active (DM #%d, wait %.1f more hours)",
+				log.Printf("[Loneliness] User %s: backoff active (DM #%d, wait %.1f more hours)",
 					userID, dmCount, (backoffDuration - timeSinceDM).Hours())
 				continue
 			}
 			// Backoff period expired, user is eligible for another DM
-			log.Printf("User %s: backoff expired (DM #%d), eligible for next DM", userID, dmCount)
+			log.Printf("[Loneliness] User %s: backoff expired (DM #%d), eligible for next DM", userID, dmCount)
 		}
 
 		// Check last interaction time
 		lastInteraction, err := h.memoryStore.GetLastInteraction(userID)
 		if err != nil {
-			log.Printf("Error getting last interaction for %s: %v", userID, err)
+			log.Printf("[Loneliness] Error getting last interaction for %s: %v", userID, err)
 			continue
 		}
 
@@ -113,7 +113,7 @@ func (h *Handler) performLonelinessCheck() bool {
 	}
 
 	if len(eligibleUsers) == 0 {
-		log.Println("No eligible users for boredom DM (all in backoff or were active recently)")
+		log.Println("[Loneliness] No eligible users for boredom DM (all in backoff or were active recently)")
 		return false
 	}
 
@@ -206,28 +206,28 @@ Just output the message text.`, userName, relationshipInstruction, attemptContex
 
 	reply, err := h.cerebrasClient.ChatCompletion(messages)
 	if err != nil {
-		log.Printf("Error generating lonely message: %v", err)
+		log.Printf("[Loneliness] Error generating lonely message: %v", err)
 		return false
 	}
 
 	// 6. Send DM
 	ch, err := h.session.UserChannelCreate(targetUserID)
 	if err != nil {
-		log.Printf("Error creating DM channel for %s: %v", targetUserID, err)
+		log.Printf("[Loneliness] Error creating DM channel for %s: %v", targetUserID, err)
 		return false
 	}
 
 	_, err = h.session.ChannelMessageSend(ch.ID, reply)
 	if err != nil {
-		log.Printf("Error sending lonely message to %s: %v", targetUserID, err)
+		log.Printf("[Loneliness] Error sending lonely message to %s: %v", targetUserID, err)
 		return false
 	}
 
-	log.Printf("Sent boredom DM to %s: %s", userName, reply)
+	log.Printf("[Loneliness] Sent boredom DM to %s: %s", userName, reply)
 
 	// 7. Mark as pending (Duolingo-style: won't send again until they respond)
 	if err := h.memoryStore.SetPendingDM(targetUserID, time.Now()); err != nil {
-		log.Printf("Error setting pending DM for %s: %v", targetUserID, err)
+		log.Printf("[Loneliness] Error setting pending DM for %s: %v", targetUserID, err)
 	}
 
 	// Update global interaction time so we don't spam

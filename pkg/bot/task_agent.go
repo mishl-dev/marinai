@@ -31,16 +31,16 @@ func (ta *TaskAgent) CheckTask(userMsg string) (bool, string) {
 
 	label, score, err := ta.cerebrasClient.Classify(userMsg, labels)
 	if err != nil {
-		log.Printf("Error classifying task: %v", err)
+		log.Printf("[Task Agent] Error classifying task: %v", err)
 		// Fallback to assuming it's safe if classifier fails
 		return false, ""
 	}
 
-	log.Printf("Task Classification: '%s' (score: %.2f)", label, score)
+	log.Printf("[Task Agent] Task Classification: '%s' (score: %.2f)", label, score)
 
 	// Only refuse if it is explicitly a task request with high confidence
 	if label == "requesting for long writing task" && score >= 0.9 {
-		log.Printf("Detected long writing task (score: %.2f), generating refusal", score)
+		log.Printf("[Task Agent] Detected long writing task (score: %.2f), generating refusal", score)
 	} else {
 		return false, ""
 	}
@@ -68,7 +68,7 @@ Chat Style (Discord Mode):
 
 	resp, err := ta.cerebrasClient.ChatCompletion(messages)
 	if err != nil {
-		log.Printf("Error generating refusal: %v", err)
+		log.Printf("[Task Agent] Error generating refusal: %v", err)
 		return true, "Hah? Do it yourself. I'm busy." // Fallback refusal
 	}
 
