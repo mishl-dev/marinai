@@ -308,6 +308,8 @@ func (c *Client) makeRequestWithKey(reqBody Request, apiKey string) (string, Usa
 
 // Returns the best matching label and a confidence score (0.0-1.0)
 func (c *Client) Classify(text string, labels []string) (string, float64, error) {
+	start := time.Now()
+
 	// Build the labels list for the prompt
 	labelsStr := ""
 	for i, label := range labels {
@@ -369,9 +371,14 @@ Output ONLY valid JSON. Example: {"label": "neutral", "confidence": 0.85}`, labe
 		Confidence float64 `json:"confidence"`
 	}
 	if err := json.Unmarshal([]byte(responseText), &result); err != nil {
+		// Log the parsing failure with the raw response for debugging
+		log.Printf("Warning: Failed to parse classification JSON from model %s: %v. Raw response: %q", reqBody.Model, err, responseText)
 		// If JSON parsing fails, return the first label as fallback
 		return labels[0], 0.5, nil
 	}
+
+	duration := time.Since(start)
+	log.Printf("Classification success (took %v): label='%s', confidence=%.2f", duration, result.Label, result.Confidence)
 
 	return result.Label, result.Confidence, nil
 }
