@@ -12,6 +12,10 @@ import (
 // SlashCommands defines all available slash commands
 var SlashCommands = []*discordgo.ApplicationCommand{
 	{
+		Name:        "testcmd",
+		Description: "Test command description",
+	},
+	{
 		Name:        "reset",
 		Description: "Permanently delete all your conversation history and memories",
 	},
@@ -31,6 +35,7 @@ var SlashCommands = []*discordgo.ApplicationCommand{
 
 // SlashCommandHandlers maps command names to their handler functions
 var SlashCommandHandlers = map[string]func(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate){
+	"testcmd":   handleTestcmdCommand,
 	"reset":     handleResetCommand,
 	"stats":     handleStatsCommand,
 	"mood":      handleMoodCommand,
@@ -576,4 +581,20 @@ func getSleepTimeRemaining() string {
 		return fmt.Sprintf("💤 *wakes up in ~%dh %dm*", hours, minutes)
 	}
 	return fmt.Sprintf("💤 *wakes up in ~%dm*", minutes)
+}
+
+// handleTestcmdCommand handles the /testcmd slash command
+func handleTestcmdCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
+	// Respond to the interaction
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: "Command /testcmd executed!",
+			Flags:   discordgo.MessageFlagsEphemeral,
+		},
+	})
+
+	if err != nil {
+		log.Printf("Error responding to testcmd command: %v", err)
+	}
 }
