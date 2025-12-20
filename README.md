@@ -129,7 +129,7 @@ When a conversation ends with Marin's reply (you "leave her on read"), she might
 
 - **Trigger**: User goes inactive for 30+ minutes after Marin's last message
 - **Chance**: Based on affection level (5% for casual friends → 35% for Special Someone)
-- **Delay**: Higher affection = shorter delay (30 min-3 hrs for close friends, 4-12 hrs for newer friends)
+- **Delay**: Higher affection = shorter delay (30m-3h for soulmates, 1h-5h for close friends, 4h-12h for newer friends)
 - **Context-aware**: References what you were talking about earlier
 - **Natural**: Messages like *"wait i was thinking about what you said earlier..."*
 
@@ -229,7 +229,7 @@ memory:
 |----------|----------|-------------|
 | `DISCORD_TOKEN` | ✅ | Your Discord bot token |
 | `CEREBRAS_API_KEY` | ✅ | Cerebras API key for LLM |
-| `EMBEDDING_API_URL` | ✅ | Endpoint for text embeddings |
+| `EMBEDDING_API_URL` | ❌ | Endpoint for text embeddings (default provided) |
 | `EMBEDDING_API_KEY` | ✅ | API key for embeddings |
 | `SURREAL_DB_HOST` | ✅ | SurrealDB WebSocket URL |
 | `SURREAL_DB_USER` | ✅ | SurrealDB username |
