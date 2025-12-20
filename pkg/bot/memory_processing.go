@@ -70,43 +70,66 @@ func (h *Handler) extractMemories(userID string, userName string, userMessage st
 - Information that is clearly already known (see Current Profile)`
 
 	// User Prompt: Focuses on extracting useful personal information
-	extractionPrompt := fmt.Sprintf(`Current Profile:
+	extractionPrompt := fmt.Sprintf(`
+# CONTEXT
+<profile>
 %s
+</profile>
+<time>
+%s
+</time>
 
-Current Time: %s
-
-New Interaction:
+# INTERACTION
+<chat>
 %s: "%s"
 Marin: "%s"
+</chat>
 
-Task: Analyze the interaction and output a JSON object with "add", "remove", and "reminders" lists.
+# TARGET
+<task>
+Analyze the interaction and output a JSON object with "add", "remove", and "reminders" lists.
+</task>
 
-WHAT TO SAVE (add to "add" list):
-- Location: where they live, where they moved to, where they're from
-- Job/School: what they do, where they work/study  
-- Hobbies: games they play, shows they watch, things they enjoy
-- Relationships: if they mention partners, pets, family
-- Strong preferences: favorite things, things they hate
-- Life events: graduations, new jobs, moves, major purchases
-
-WHAT NOT TO SAVE:
+# RULES
+<save>
+- Location: Where they live, move, or are from.
+- Job/School: What they do, where they work/study.
+- Hobbies: Games, shows, interests.
+- Relationships: Mention of partners, pets, family.
+- Preferences: Favorite things, things they hate.
+- Life events: Graduations, new jobs, moves.
+</save>
+<ignore>
 %s
+</ignore>
 
-CONTRADICTIONS:
-If the user says something that contradicts an existing fact (e.g., they moved to a new city), add the new fact to "add" AND the old conflicting fact to "remove".
+<contradictions>
+If the user says something that contradicts an existing fact, add the new fact to "add" AND the old conflicting fact to "remove".
+</contradictions>
 
-REMINDERS:
-If they mention a specific future event with a timeframe, create a reminder with "delay_seconds" (seconds until event) and "text" (event description).
+<reminders>
+If they mention a specific future event with a timeframe, create a reminder with "delay_seconds" and "text".
+</reminders>
 
-Output ONLY valid JSON. Example: {"add": ["Lives in Tokyo"], "remove": [], "reminders": []}`, currentProfile, currentTimeStr, userName, userMessage, botReply, exclusionList)
+# MANDATORY
+Output ONLY valid JSON.
+Example: {"add": ["Lives in Tokyo"], "remove": [], "reminders": []}`, currentProfile, currentTimeStr, userName, userMessage, botReply, exclusionList)
 
 	messages := []cerebras.Message{
 		{
 			Role: "system",
-			Content: fmt.Sprintf(`You are a helpful assistant that extracts personal facts about the USER from conversations.
-Your job is to identify and save important information about the USER (%s) that would be useful to remember.
-CRITICAL: Extract facts ONLY about %s. DO NOT extract facts about Marin or the AI.
-Output ONLY valid JSON with "add", "remove", and "reminders" arrays.`, userName, userName),
+			Content: fmt.Sprintf(`
+# INSTRUCTION
+<role>
+You are an extraction assistant for Marin Kitagawa. Identify and save important personal facts about the USER (%s).
+</role>
+
+# CONSTRAINTS
+<rules>
+- Extract facts ONLY about %s. 
+- DO NOT extract facts about Marin, the AI, or roleplay scenarios.
+- Output ONLY valid JSON.
+</rules>`, userName, userName),
 		},
 		{
 			Role:    "user",
