@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -17,9 +19,10 @@ const (
 
 // Client handles image understanding via Gemini Vision API
 type Client struct {
-	apiKey string
-	client *http.Client
-	apiURL string
+	apiKey        string
+	client        *http.Client
+	apiURL        string
+	allowLocalIPs bool // For testing purposes only
 }
 
 // NewClient creates a new Gemini Vision client
@@ -29,7 +32,8 @@ func NewClient(apiKey string) *Client {
 		client: &http.Client{
 			Timeout: 90 * time.Second,
 		},
-		apiURL: defaultGeminiAPIURL,
+		apiURL:        defaultGeminiAPIURL,
+		allowLocalIPs: false,
 	}
 }
 
@@ -206,8 +210,45 @@ If there's text in the image, mention what it says.`
 	}, nil
 }
 
+// validateURL checks if the URL is safe to fetch (SSRF protection)
+func (c *Client) validateURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+
+	// Ensure scheme is http or https
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("unsupported scheme: %s", u.Scheme)
+	}
+
+	// Resolve the host to IP addresses
+	host := u.Hostname()
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return fmt.Errorf("failed to resolve host: %w", err)
+	}
+
+	// Check if any IP is private, loopback, or link-local
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
+			return fmt.Errorf("blocked access to restricted IP: %s", ip.String())
+		}
+	}
+
+	return nil
+}
+
 // DescribeImageFromURL fetches an image from a URL and describes it
 func (c *Client) DescribeImageFromURL(imageURL string) (*ImageDescription, error) {
+	// Security: Validate URL before fetching to prevent SSRF
+	// Skip validation if testing with local IPs explicitly allowed
+	if !c.allowLocalIPs {
+		if err := c.validateURL(imageURL); err != nil {
+			return nil, fmt.Errorf("security validation failed: %w", err)
+		}
+	}
+
 	// Fetch the image
 	resp, err := c.client.Get(imageURL)
 	if err != nil {

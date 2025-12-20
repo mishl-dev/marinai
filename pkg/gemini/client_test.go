@@ -33,12 +33,6 @@ func TestDescribeImageFromURL(t *testing.T) {
 		assert.Equal(t, "test-key", r.URL.Query().Get("key"))
 
 		w.Header().Set("Content-Type", "application/json")
-		// Use anonymous struct matching the json structure to avoid exporting internal types just for tests,
-		// or duplicate the struct definition here. Since we can't easily access the unexported types in another package
-		// without exporting them, and we shouldn't export them just for tests, we'll define a local equivalent.
-		// Wait, we are in package `gemini`, so we CAN access unexported types.
-		// The issue was likely composite literal syntax for complex nested structs.
-
 		response := geminiResponse{
 			Candidates: []struct {
 				Content struct {
@@ -74,12 +68,31 @@ func TestDescribeImageFromURL(t *testing.T) {
 	// Initialize client
 	client := NewClient("test-key")
 	client.apiURL = geminiServer.URL + "/v1beta/models/gemini-flash-lite-latest:generateContent"
+	client.allowLocalIPs = true // Enable testing with local server
 
-	// Test DescribeImageFromURL
+	// Test DescribeImageFromURL (Happy Path)
 	desc, err := client.DescribeImageFromURL(imageServer.URL + "/image.png")
 	require.NoError(t, err)
 	assert.Equal(t, "A test image description.", desc.Description)
 	assert.False(t, desc.IsNSFW)
+}
+
+func TestDescribeImageFromURL_SSRF(t *testing.T) {
+	// Initialize client
+	client := NewClient("test-key")
+	client.allowLocalIPs = false // Explicitly enable security checks
+
+	// Test Localhost Access Blocking
+	// We can use any localhost URL, it doesn't need to exist because validation happens first
+	desc, err := client.DescribeImageFromURL("http://127.0.0.1:8080/image.png")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "blocked access to restricted IP")
+	assert.Nil(t, desc)
+
+	desc, err = client.DescribeImageFromURL("http://localhost:8080/image.png")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "blocked access to restricted IP")
+	assert.Nil(t, desc)
 }
 
 func TestClassify(t *testing.T) {
