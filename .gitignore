@@ -40,3 +40,5 @@ invoke.py
 # Vibes benchmark
 .benchmarks/*
 !.benchmarks/questions.json
+.benchmarks/response_cache.json
+.benchmarks/battle_cache.json
