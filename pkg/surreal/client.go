@@ -3,8 +3,10 @@ package surreal
 import (
 	"context"
 	"fmt"
+	"log"
 	"reflect"
 	"regexp"
+	"time"
 
 	"github.com/surrealdb/surrealdb.go"
 )
@@ -47,7 +49,18 @@ func (c *Client) Close() {
 	c.db.Close(context.Background())
 }
 
+// logOperation logs slow operations (>100ms) and errors
+func (c *Client) logOperation(op, details string, start time.Time, err error) {
+	duration := time.Since(start)
+	if err != nil {
+		log.Printf("[Surreal] %s ERROR: %v | %s | Duration: %v", op, err, details, duration)
+	} else if duration > 100*time.Millisecond {
+		log.Printf("[Surreal] %s SLOW: %v | %s", op, duration, details)
+	}
+}
+
 func (c *Client) Query(sql string, vars interface{}) (interface{}, error) {
+	start := time.Now()
 	var queryVars map[string]interface{}
 
 	if vars == nil {
@@ -59,6 +72,10 @@ func (c *Client) Query(sql string, vars interface{}) (interface{}, error) {
 	}
 
 	result, err := surrealdb.Query[interface{}](context.Background(), c.db, sql, queryVars)
+
+	// Log after execution
+	c.logOperation("Query", sql, start, err)
+
 	if err != nil {
 		return nil, err
 	}
@@ -99,14 +116,19 @@ func (c *Client) Query(sql string, vars interface{}) (interface{}, error) {
 }
 
 func (c *Client) Create(thing string, data interface{}) (interface{}, error) {
+	start := time.Now()
 	result, err := surrealdb.Create[interface{}](context.Background(), c.db, thing, data)
+	c.logOperation("Create", thing, start, err)
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
 }
+
 func (c *Client) Select(thing string) (interface{}, error) {
+	start := time.Now()
 	result, err := surrealdb.Select[interface{}](context.Background(), c.db, thing)
+	c.logOperation("Select", thing, start, err)
 	if err != nil {
 		return nil, err
 	}
@@ -144,6 +166,7 @@ func (c *Client) VectorSearch(table string, vectorField string, queryVector []fl
 		vars[k] = v
 	}
 
+	// Logging is handled inside Query
 	result, err := c.Query(query, vars)
 	if err != nil {
 		return nil, err
