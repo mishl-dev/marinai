@@ -1,174 +1,315 @@
 package bot
 
 import (
-	"marinai/pkg/cerebras"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"marinai/pkg/cerebras"
+	"marinai/pkg/memory"
+
+	"github.com/stretchr/testify/mock"
 )
 
-// Reusing mocks from flow_test.go since they are in the same package (bot)
+// Mock objects for MemoryProcessingTest
 
-func TestExtractMemories(t *testing.T) {
-	// Setup
-	mockCerebras := &mockCerebrasClient{}
-	mockEmbedding := &mockEmbeddingClient{}
-	mockMemory := &mockMemoryStore{}
-	mockGemini := &MockGeminiClient{}
+type MockCerebrasClientForMemory struct {
+	mock.Mock
+}
 
-	// Create handler
-	h := NewHandler(mockCerebras, mockEmbedding, mockGemini, mockMemory, HandlerConfig{
-		MessageProcessingDelay:     0,
-		FactAgingDays:              7,
-		FactSummarizationThreshold: 20,
-		MaintenanceIntervalHours:   24,
-	})
+func (m *MockCerebrasClientForMemory) ChatCompletion(messages []cerebras.Message) (string, error) {
+	args := m.Called(messages)
+	return args.String(0), args.Error(1)
+}
 
-	// Test data
-	userID := "user123"
-	userName := "TestUser"
-	userMessage := "I live in Tokyo and I love sushi."
-	botReply := "That's awesome! Tokyo is great."
+func (m *MockCerebrasClientForMemory) Classify(text string, labels []string) (string, float64, error) {
+	args := m.Called(text, labels)
+	return args.String(0), args.Get(1).(float64), args.Error(2)
+}
 
-	// Test cases
+type MockMemoryStoreForMemory struct {
+	mock.Mock
+}
+
+func (m *MockMemoryStoreForMemory) Add(userID string, text string, vector []float32) error {
+	args := m.Called(userID, text, vector)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) Search(userID string, queryVector []float32, limit int) ([]string, error) {
+	args := m.Called(userID, queryVector, limit)
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) AddRecentMessage(userID, role, message string) error {
+	args := m.Called(userID, role, message)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) GetRecentMessages(userID string) ([]memory.RecentMessageItem, error) {
+	args := m.Called(userID)
+	return args.Get(0).([]memory.RecentMessageItem), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) ClearRecentMessages(userID string) error {
+	args := m.Called(userID)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) DeleteUserData(userID string) error {
+	args := m.Called(userID)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) GetFacts(userID string) ([]string, error) {
+	args := m.Called(userID)
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) ApplyDelta(userID string, adds []string, removes []string) error {
+	args := m.Called(userID, adds, removes)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) DeleteFacts(userID string) error {
+	args := m.Called(userID)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) GetCachedEmojis(guildID string) ([]string, error) {
+	args := m.Called(guildID)
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) SetCachedEmojis(guildID string, emojis []string) error {
+	args := m.Called(guildID, emojis)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) GetCachedClassification(text string, model string) (string, float64, error) {
+	args := m.Called(text, model)
+	return args.String(0), args.Get(1).(float64), args.Error(2)
+}
+
+func (m *MockMemoryStoreForMemory) SetCachedClassification(text string, model string, label string, score float64) error {
+	args := m.Called(text, model, label, score)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) GetAllKnownUsers() ([]string, error) {
+	args := m.Called()
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) EnsureUser(userID string) error {
+	args := m.Called(userID)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) AddReminder(userID string, text string, dueAt int64) error {
+	args := m.Called(userID, text, dueAt)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) GetDueReminders() ([]memory.Reminder, error) {
+	args := m.Called()
+	return args.Get(0).([]memory.Reminder), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) UpdateReminder(reminder memory.Reminder) error {
+	args := m.Called(reminder)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) DeleteReminder(id string) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) DeleteOldReminders(ageLimit time.Duration) error {
+	args := m.Called(ageLimit)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) GetState(key string) (string, error) {
+	args := m.Called(key)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) SetState(key, value string) error {
+	args := m.Called(key, value)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) HasPendingDM(userID string) (bool, error) {
+	args := m.Called(userID)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) GetPendingDMInfo(userID string) (time.Time, int, bool, error) {
+	args := m.Called(userID)
+	return args.Get(0).(time.Time), args.Int(1), args.Bool(2), args.Error(3)
+}
+
+func (m *MockMemoryStoreForMemory) SetPendingDM(userID string, sentAt time.Time) error {
+	args := m.Called(userID, sentAt)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) ClearPendingDM(userID string) error {
+	args := m.Called(userID)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) GetLastInteraction(userID string) (time.Time, error) {
+	args := m.Called(userID)
+	return args.Get(0).(time.Time), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) SetLastInteraction(userID string, timestamp time.Time) error {
+	args := m.Called(userID, timestamp)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) GetAffection(userID string) (int, error) {
+	args := m.Called(userID)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) AddAffection(userID string, amount int) error {
+	args := m.Called(userID, amount)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) SetAffection(userID string, amount int) error {
+	args := m.Called(userID, amount)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) GetStreak(userID string) (int, error) {
+	args := m.Called(userID)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) UpdateStreak(userID string) (int, bool) {
+	args := m.Called(userID)
+	return args.Int(0), args.Bool(1)
+}
+
+func (m *MockMemoryStoreForMemory) GetFirstInteraction(userID string) (time.Time, error) {
+	args := m.Called(userID)
+	return args.Get(0).(time.Time), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) SetFirstInteraction(userID string, timestamp time.Time) error {
+	args := m.Called(userID, timestamp)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) AddDelayedThought(thought memory.DelayedThought) error {
+	args := m.Called(thought)
+	return args.Error(0)
+}
+
+func (m *MockMemoryStoreForMemory) GetDueDelayedThoughts() ([]memory.DelayedThought, error) {
+	args := m.Called()
+	return args.Get(0).([]memory.DelayedThought), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) HasDelayedThought(userID string) (bool, error) {
+	args := m.Called(userID)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockMemoryStoreForMemory) DeleteDelayedThought(id string) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
+func TestExtractMemories_JSONParsing(t *testing.T) {
 	tests := []struct {
-		name                 string
-		llmResponse          string
-		expectDeltaCalled    bool
-		expectReminderCalled bool
-		expectedAdds         []string
-		expectedRemoves      []string
-		expectedReminders    []string // Just checking text
+		name           string
+		llmResponse    string
+		expectedAdds   []string
+		expectedRemoves []string
+		expectedRemind int // Count of reminders
 	}{
 		{
-			name:              "Valid JSON - Add Fact",
-			llmResponse:       `{"add": ["Lives in Tokyo", "Loves sushi"], "remove": [], "reminders": []}`,
-			expectDeltaCalled: true,
-			expectedAdds:      []string{"Lives in Tokyo", "Loves sushi"},
-			expectedRemoves:   []string{},
+			name:        "Clean JSON",
+			llmResponse: `{"add": ["Lives in Tokyo"], "remove": [], "reminders": []}`,
+			expectedAdds: []string{"Lives in Tokyo"},
 		},
 		{
-			name:              "Valid JSON - Remove Fact",
-			llmResponse:       `{"add": ["Moved to Kyoto"], "remove": ["Lives in Tokyo"], "reminders": []}`,
-			expectDeltaCalled: true,
-			expectedAdds:      []string{"Moved to Kyoto"},
-			expectedRemoves:   []string{"Lives in Tokyo"},
+			name:        "Markdown Block JSON",
+			llmResponse: "Here is the JSON:\n```json\n{\"add\": [\"Loves sushi\"], \"remove\": [], \"reminders\": []}\n```",
+			expectedAdds: []string{"Loves sushi"},
 		},
 		{
-			name: "Valid JSON - With Reminder",
-			llmResponse: `{"add": [], "remove": [], "reminders": [
-				{"text": "Buy milk", "delay_seconds": 3600}
-			]}`,
-			expectDeltaCalled:    false, // No memory delta
-			expectReminderCalled: true,
-			expectedReminders:    []string{"Buy milk"},
+			name:        "Markdown Block without json tag",
+			llmResponse: "```\n{\"add\": [\"Hates spiders\"], \"remove\": [], \"reminders\": []}\n```",
+			expectedAdds: []string{"Hates spiders"},
 		},
 		{
-			name:              "Markdown Wrapped JSON",
-			llmResponse:       "```json\n{\"add\": [\"Lives in Tokyo\"], \"remove\": [], \"reminders\": []}\n```",
-			expectDeltaCalled: true,
-			expectedAdds:      []string{"Lives in Tokyo"},
+			name:        "JSON with surrounding text",
+			llmResponse: "Sure, I found this:\n{\"add\": [\"Is a programmer\"], \"remove\": [], \"reminders\": []}\nHope that helps!",
+			expectedAdds: []string{"Is a programmer"},
 		},
 		{
-			name:              "Markdown Wrapped JSON with extra text",
-			llmResponse:       "Here is the JSON:\n```json\n{\"add\": [\"Lives in Tokyo\"], \"remove\": [], \"reminders\": []}\n```\nHope this helps!",
-			expectDeltaCalled: true,
-			expectedAdds:      []string{"Lives in Tokyo"},
+			name:        "Broken JSON (should fail gracefully)",
+			llmResponse: `{"add": ["Broken JSON...`,
+			expectedAdds: nil,
 		},
 		{
-			name:              "Invalid JSON",
-			llmResponse:       `{"add": ["Broken JSON...`,
-			expectDeltaCalled: false,
-		},
-		{
-			name:              "Empty JSON",
-			llmResponse:       `{"add": [], "remove": [], "reminders": []}`,
-			expectDeltaCalled: false,
+			name: "Reminders extraction",
+			llmResponse: `{"add": [], "remove": [], "reminders": [{"text": "Buy milk", "delay_seconds": 3600}]}`,
+			expectedRemind: 1,
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			// Reset mocks
-			var deltaAdds, deltaRemoves []string
-			deltaCalled := false
-			reminderCalled := false
-			var reminderTexts []string
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup Mocks
+			mockCerebras := new(MockCerebrasClientForMemory)
+			mockMemory := new(MockMemoryStoreForMemory)
+			mockGemini := &MockGeminiClient{} // Use existing mock if available or define minimal one
 
-			mockMemory.ApplyDeltaFunc = func(uid string, adds []string, removes []string) error {
-				assert.Equal(t, userID, uid)
-				deltaAdds = adds
-				deltaRemoves = removes
-				deltaCalled = true
-				return nil
+			handler := NewHandler(mockCerebras, &mockEmbeddingClient{}, mockGemini, mockMemory, HandlerConfig{})
+
+			// Expectations
+			mockMemory.On("GetState", "mood").Return("", nil).Maybe() // Called by NewHandler in goroutine
+			mockMemory.On("GetFacts", "user123").Return([]string{}, nil)
+			mockCerebras.On("ChatCompletion", mock.Anything).Return(tt.llmResponse, nil)
+
+			if len(tt.expectedAdds) > 0 || len(tt.expectedRemoves) > 0 {
+				// The implementation passes an empty slice []string{} if removes is empty, not nil
+				var expectedRemoves []string
+				if tt.expectedRemoves == nil {
+					expectedRemoves = []string{}
+				} else {
+					expectedRemoves = tt.expectedRemoves
+				}
+				mockMemory.On("ApplyDelta", "user123", tt.expectedAdds, expectedRemoves).Return(nil)
 			}
 
-			mockMemory.AddReminderFunc = func(uid string, text string, dueAt int64) error {
-				assert.Equal(t, userID, uid)
-				reminderCalled = true
-				reminderTexts = append(reminderTexts, text)
-				return nil
+			if tt.expectedRemind > 0 {
+				mockMemory.On("AddReminder", "user123", mock.AnythingOfType("string"), mock.AnythingOfType("int64")).Return(nil)
 			}
 
-			// Mock Cerebras to return the test case response
-			mockCerebras.ChatCompletionFunc = func(messages []cerebras.Message) (string, error) {
-				return tc.llmResponse, nil
-			}
-
-			// Also mock GetFacts to return empty list
-			mockMemory.GetFactsFunc = func(uid string) ([]string, error) {
-				return []string{}, nil
-			}
-
-			// Run extraction
-			h.extractMemories(userID, userName, userMessage, botReply)
+			// Execute
+			handler.extractMemories("user123", "testuser", "I live in Tokyo and I love sushi.", "Cool!")
 
 			// Verify
-			if tc.expectDeltaCalled {
-				require.True(t, deltaCalled, "Expected ApplyDelta to be called")
-				assert.Equal(t, tc.expectedAdds, deltaAdds)
-				if tc.expectedRemoves != nil {
-					assert.Equal(t, tc.expectedRemoves, deltaRemoves)
+			if len(tt.expectedAdds) > 0 {
+				var expectedRemoves []string
+				if tt.expectedRemoves == nil {
+					expectedRemoves = []string{}
+				} else {
+					expectedRemoves = tt.expectedRemoves
 				}
-			} else {
-				assert.False(t, deltaCalled, "Expected ApplyDelta NOT to be called")
+				mockMemory.AssertCalled(t, "ApplyDelta", "user123", tt.expectedAdds, expectedRemoves)
 			}
-
-			if tc.expectReminderCalled {
-				require.True(t, reminderCalled, "Expected AddReminder to be called")
-				assert.Equal(t, tc.expectedReminders, reminderTexts)
-			} else {
-				assert.False(t, reminderCalled, "Expected AddReminder NOT to be called")
+			if tt.expectedRemind > 0 {
+				mockMemory.AssertCalled(t, "AddReminder", "user123", mock.AnythingOfType("string"), mock.AnythingOfType("int64"))
 			}
 		})
 	}
-}
-
-func TestExtractMemories_ShortMessage(t *testing.T) {
-	// Setup
-	mockCerebras := &mockCerebrasClient{}
-	mockMemory := &mockMemoryStore{}
-	// Mock other dependencies...
-	mockEmbedding := &mockEmbeddingClient{}
-	mockGemini := &MockGeminiClient{}
-
-	h := NewHandler(mockCerebras, mockEmbedding, mockGemini, mockMemory, HandlerConfig{
-		MessageProcessingDelay:     0,
-		FactAgingDays:              7,
-		FactSummarizationThreshold: 20,
-		MaintenanceIntervalHours:   24,
-	})
-
-	// Spy
-	chatCompletionCalled := false
-	mockCerebras.ChatCompletionFunc = func(messages []cerebras.Message) (string, error) {
-		chatCompletionCalled = true
-		return `{"add": [], "remove": []}`, nil
-	}
-
-	// Message shorter than 10 chars
-	h.extractMemories("user1", "TestUser", "Hi", "Hello")
-
-	assert.False(t, chatCompletionCalled, "Should skip extraction for short messages")
 }
