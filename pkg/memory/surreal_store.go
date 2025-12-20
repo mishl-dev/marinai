@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"marinai/pkg/surreal"
+	"math/rand"
 	"reflect"
 	"strings"
 	"time"
@@ -344,6 +345,13 @@ func (s *SurrealStore) AddRecentMessage(userID, role, message string) error {
 		return err
 	}
 
+	// Optimization: Probabilistic cleanup (10% chance)
+	// Instead of running a complex DELETE query on every message, we only run it occasionally.
+	// This significantly reduces write amplification for chat-heavy workloads.
+	if rand.Float32() > 0.1 {
+		return nil
+	}
+
 	// Cleanup old messages (keep last 15)
 	query := `
 		DELETE recent_messages
@@ -362,11 +370,13 @@ func (s *SurrealStore) AddRecentMessage(userID, role, message string) error {
 }
 
 func (s *SurrealStore) GetRecentMessages(userID string) ([]RecentMessageItem, error) {
-	// Include 'timestamp' in SELECT since we're ordering by it
+	// Fetch the NEWEST 20 messages (ORDER BY timestamp DESC)
+	// We use a subquery or just reverse in Go. Reversing in Go is simpler given the driver structure.
 	query := `
 		SELECT role, text, timestamp FROM recent_messages
 		WHERE user_id = $user_id
-		ORDER BY timestamp ASC;
+		ORDER BY timestamp DESC
+		LIMIT 20;
 	`
 
 	result, err := s.client.Query(query, map[string]interface{}{"user_id": userID})
@@ -379,8 +389,10 @@ func (s *SurrealStore) GetRecentMessages(userID string) ([]RecentMessageItem, er
 		return []RecentMessageItem{}, nil
 	}
 
+	// Iterate backwards to return them in chronological order (ASC)
 	messages := make([]RecentMessageItem, 0, len(rows))
-	for _, row := range rows {
+	for i := len(rows) - 1; i >= 0; i-- {
+		row := rows[i]
 		if rowMap, ok := row.(map[string]interface{}); ok {
 			// Manually map fields to struct to be safe
 			msg := RecentMessageItem{}
@@ -681,7 +693,7 @@ func (s *SurrealStore) GetFacts(userID string) ([]string, error) {
 				facts = make([]string, 0, len(f))
 			}
 			for _, item := range f {
-				// Facts are now objects with {text: string, created_at: int}
+				// Facts are objects with {text: string, created_at: int}
 				if factMap, ok := item.(map[string]interface{}); ok {
 					if text, ok := factMap["text"].(string); ok {
 						facts = append(facts, text)

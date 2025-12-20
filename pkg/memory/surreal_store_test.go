@@ -199,27 +199,36 @@ func TestSurrealStore_RecentMessages(t *testing.T) {
 
 	// Test 2: Limit check (add more messages to trigger cleanup)
 	t.Run("Limit check", func(t *testing.T) {
-		// Add 15 more messages (total 18)
-		for i := 0; i < 15; i++ {
+		// Add enough messages to definitely exceed limit (25 total)
+		// Initial 3 + 22 new ones = 25
+		for i := 0; i < 22; i++ {
 			msg := fmt.Sprintf("Message %d", i)
 			err := store.AddRecentMessage(testUserID, "user", msg)
 			require.NoError(t, err, "Failed to add message")
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(5 * time.Millisecond)
 		}
 
 		storedMessages, err := store.GetRecentMessages(testUserID)
 		require.NoError(t, err, "Failed to get recent messages")
 
-		// Should be capped at 15
-		assert.Len(t, storedMessages, 15, "Expected 15 messages (limit)")
+		// Should be capped at 20 (read limit)
+		// Due to probabilistic cleanup (10%), the count might drop to 15 occasionally, or stay up to 25 if we were unlucky (unlikely with 22 inserts but possible).
+		// But since we LIMIT 20 in the query, we should never get > 20.
+		assert.LessOrEqual(t, len(storedMessages), 20, "Expected at most 20 messages (read limit)")
 
-		// The last message added should be present
+		// We expect at least 15 messages (since cleanup keeps 15)
+		// If cleanup never ran, we have 25 total, so we get 20.
+		// If cleanup ran, we have 15 left + whatever was added since.
+		assert.GreaterOrEqual(t, len(storedMessages), 15, "Expected at least 15 messages (cleanup limit)")
+
+		// Verify we have the NEWEST messages
+		// The last message added was "Message 21"
 		if len(storedMessages) > 0 {
 			lastMsg := storedMessages[len(storedMessages)-1]
-			assert.Equal(t, "Message 14", lastMsg.Text, "Expected last message to be 'Message 14'")
+			assert.Equal(t, "Message 21", lastMsg.Text, "Expected last message to be 'Message 21'")
 		}
 
-		t.Logf("✓ Successfully enforced message limit. Count: %d", len(storedMessages))
+		t.Logf("✓ Successfully enforced message limit and retrieved newest. Count: %d", len(storedMessages))
 	})
 
 	// Clean up
