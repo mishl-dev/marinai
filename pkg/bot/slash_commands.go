@@ -78,18 +78,14 @@ func handleResetCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 // handleResetConfirm handles the confirmation of memory reset
 func handleResetConfirm(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
 	// Get user ID
-	var userID string
-	if i.Member != nil {
-		userID = i.Member.User.ID
-	} else if i.User != nil {
-		userID = i.User.ID
-	} else {
-		log.Printf("Error: Could not determine user ID for reset confirm")
+	userID, _, err := getUserFromInteraction(i)
+	if err != nil {
+		log.Printf("Error: %v", err)
 		return
 	}
 
 	// Reset the user's memory
-	err := h.ResetMemory(userID)
+	err = h.ResetMemory(userID)
 
 	responseContent := "Memory reset! Starting fresh. 💭✨"
 	if err != nil {
@@ -129,22 +125,9 @@ func handleResetCancel(h *Handler, s *discordgo.Session, i *discordgo.Interactio
 // handleStatsCommand handles the /stats slash command - shows what Marin remembers
 func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
 	// Get user ID
-	var userID string
-	var userName string
-	if i.Member != nil {
-		userID = i.Member.User.ID
-		userName = i.Member.User.Username
-		if i.Member.User.GlobalName != "" {
-			userName = i.Member.User.GlobalName
-		}
-	} else if i.User != nil {
-		userID = i.User.ID
-		userName = i.User.Username
-		if i.User.GlobalName != "" {
-			userName = i.User.GlobalName
-		}
-	} else {
-		log.Printf("Error: Could not determine user ID for stats command")
+	userID, userName, err := getUserFromInteraction(i)
+	if err != nil {
+		log.Printf("Error: %v", err)
 		return
 	}
 
@@ -387,28 +370,15 @@ func buildAffectionEmbed(h *Handler, userID, userName string) *discordgo.Message
 // handleAffectionCommand handles the /affection slash command
 func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
 	// Get user ID
-	var userID string
-	var userName string
-	if i.Member != nil {
-		userID = i.Member.User.ID
-		userName = i.Member.User.Username
-		if i.Member.User.GlobalName != "" {
-			userName = i.Member.User.GlobalName
-		}
-	} else if i.User != nil {
-		userID = i.User.ID
-		userName = i.User.Username
-		if i.User.GlobalName != "" {
-			userName = i.User.GlobalName
-		}
-	} else {
-		log.Printf("Error: Could not determine user ID for affection command")
+	userID, userName, err := getUserFromInteraction(i)
+	if err != nil {
+		log.Printf("Error: %v", err)
 		return
 	}
 
 	embed := buildAffectionEmbed(h, userID, userName)
 
-	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Embeds: []*discordgo.MessageEmbed{embed},
@@ -438,28 +408,15 @@ func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.Inter
 // handleAffectionRefresh updates the existing affection message
 func handleAffectionRefresh(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
 	// Get user ID (refresh button interaction also has user info)
-	var userID string
-	var userName string
-	if i.Member != nil {
-		userID = i.Member.User.ID
-		userName = i.Member.User.Username
-		if i.Member.User.GlobalName != "" {
-			userName = i.Member.User.GlobalName
-		}
-	} else if i.User != nil {
-		userID = i.User.ID
-		userName = i.User.Username
-		if i.User.GlobalName != "" {
-			userName = i.User.GlobalName
-		}
-	} else {
-		log.Printf("Error: Could not determine user ID for affection refresh")
+	userID, userName, err := getUserFromInteraction(i)
+	if err != nil {
+		log.Printf("Error: %v", err)
 		return
 	}
 
 	embed := buildAffectionEmbed(h, userID, userName)
 
-	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseUpdateMessage,
 		Data: &discordgo.InteractionResponseData{
 			Embeds: []*discordgo.MessageEmbed{embed},
