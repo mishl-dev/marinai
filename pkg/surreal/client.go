@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"reflect"
 	"regexp"
 	"time"
 
@@ -71,6 +70,7 @@ func (c *Client) Query(sql string, vars interface{}) (interface{}, error) {
 		return nil, fmt.Errorf("vars must be map[string]interface{} or nil, got %T", vars)
 	}
 
+	// This returns *[]surrealdb.QueryResult[interface{}]
 	result, err := surrealdb.Query[interface{}](context.Background(), c.db, sql, queryVars)
 
 	// Log after execution
@@ -80,39 +80,16 @@ func (c *Client) Query(sql string, vars interface{}) (interface{}, error) {
 		return nil, err
 	}
 
-	// Unwrap the result: *RawQueryResponse -> Result field
-	rv := reflect.ValueOf(result)
-	if rv.Kind() == reflect.Ptr {
-		rv = rv.Elem()
+	// Optimization: Direct access instead of reflection
+	// result is of type *[]surrealdb.QueryResult[interface{}]
+	if result != nil && len(*result) > 0 {
+		// Return the result of the last query (consistent with existing logic)
+		lastElem := (*result)[len(*result)-1]
+		return lastElem.Result, nil
 	}
 
-	if rv.Kind() == reflect.Struct {
-		resField := rv.FieldByName("Result")
-		if resField.IsValid() {
-			return resField.Interface(), nil
-		}
-	} else if rv.Kind() == reflect.Slice {
-		// Handle slice of results (e.g. []QueryResult)
-		if rv.Len() > 0 {
-			// Return the result of the last query (or the only one)
-			lastElem := rv.Index(rv.Len() - 1)
-			if lastElem.Kind() == reflect.Struct {
-				resField := lastElem.FieldByName("Result")
-				if resField.IsValid() {
-					return resField.Interface(), nil
-				}
-			} else if lastElem.Kind() == reflect.Map {
-				// Handle map (e.g. from interface{} unmarshal)
-				// Look for "result" key
-				resVal := lastElem.MapIndex(reflect.ValueOf("result"))
-				if resVal.IsValid() {
-					return resVal.Interface(), nil
-				}
-			}
-		}
-	}
-
-	return result, nil
+	// If result is empty or nil, return nil
+	return nil, nil
 }
 
 func (c *Client) Create(thing string, data interface{}) (interface{}, error) {
