@@ -131,15 +131,18 @@ func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 	// Get user ID
 	var userID string
 	var userName string
+	var userAvatar string
 	if i.Member != nil {
 		userID = i.Member.User.ID
 		userName = i.Member.User.Username
+		userAvatar = i.Member.User.AvatarURL("")
 		if i.Member.User.GlobalName != "" {
 			userName = i.Member.User.GlobalName
 		}
 	} else if i.User != nil {
 		userID = i.User.ID
 		userName = i.User.Username
+		userAvatar = i.User.AvatarURL("")
 		if i.User.GlobalName != "" {
 			userName = i.User.GlobalName
 		}
@@ -170,6 +173,9 @@ func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 			Title:       fmt.Sprintf("📝 Memory File: %s", userName),
 			Description: "I don't have any specific notes about you yet!",
 			Color:       0x00BFFF, // Deep Sky Blue
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
+				URL: userAvatar,
+			},
 			Fields: []*discordgo.MessageEmbedField{
 				{
 					Name: "How to help me remember:",
@@ -200,6 +206,9 @@ func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 			Title:       fmt.Sprintf("📝 Memory File: %s", userName),
 			Description: "Here's everything I've noted down about you so far!",
 			Color:       0x00BFFF, // Deep Sky Blue
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
+				URL: userAvatar,
+			},
 			Fields: []*discordgo.MessageEmbedField{
 				{
 					Name:   "Observations",
@@ -335,7 +344,7 @@ func handleMoodRefresh(h *Handler, s *discordgo.Session, i *discordgo.Interactio
 }
 
 // buildAffectionEmbed creates the embed for the affection display
-func buildAffectionEmbed(h *Handler, userID, userName string) *discordgo.MessageEmbed {
+func buildAffectionEmbed(h *Handler, userID, userName, userAvatar string) *discordgo.MessageEmbed {
 	affection, level := h.GetUserAffection(userID)
 	streak, _ := h.memoryStore.GetStreak(userID)
 
@@ -371,6 +380,9 @@ func buildAffectionEmbed(h *Handler, userID, userName string) *discordgo.Message
 		Title:       fmt.Sprintf("💕 Relationship with %s", userName),
 		Description: flavorText,
 		Color:       0xFF69B4, // Hot Pink
+		Thumbnail: &discordgo.MessageEmbedThumbnail{
+			URL: userAvatar,
+		},
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:   "Current Status",
@@ -389,15 +401,18 @@ func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.Inter
 	// Get user ID
 	var userID string
 	var userName string
+	var userAvatar string
 	if i.Member != nil {
 		userID = i.Member.User.ID
 		userName = i.Member.User.Username
+		userAvatar = i.Member.User.AvatarURL("")
 		if i.Member.User.GlobalName != "" {
 			userName = i.Member.User.GlobalName
 		}
 	} else if i.User != nil {
 		userID = i.User.ID
 		userName = i.User.Username
+		userAvatar = i.User.AvatarURL("")
 		if i.User.GlobalName != "" {
 			userName = i.User.GlobalName
 		}
@@ -406,7 +421,7 @@ func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.Inter
 		return
 	}
 
-	embed := buildAffectionEmbed(h, userID, userName)
+	embed := buildAffectionEmbed(h, userID, userName, userAvatar)
 
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -440,15 +455,18 @@ func handleAffectionRefresh(h *Handler, s *discordgo.Session, i *discordgo.Inter
 	// Get user ID (refresh button interaction also has user info)
 	var userID string
 	var userName string
+	var userAvatar string
 	if i.Member != nil {
 		userID = i.Member.User.ID
 		userName = i.Member.User.Username
+		userAvatar = i.Member.User.AvatarURL("")
 		if i.Member.User.GlobalName != "" {
 			userName = i.Member.User.GlobalName
 		}
 	} else if i.User != nil {
 		userID = i.User.ID
 		userName = i.User.Username
+		userAvatar = i.User.AvatarURL("")
 		if i.User.GlobalName != "" {
 			userName = i.User.GlobalName
 		}
@@ -457,7 +475,7 @@ func handleAffectionRefresh(h *Handler, s *discordgo.Session, i *discordgo.Inter
 		return
 	}
 
-	embed := buildAffectionEmbed(h, userID, userName)
+	embed := buildAffectionEmbed(h, userID, userName, userAvatar)
 
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseUpdateMessage,
