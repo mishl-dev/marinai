@@ -316,6 +316,20 @@ We include a helper script to verify your development environment:
 ./scripts/dev-check.sh --all
 ```
 
+### Vibe Benchmark
+
+Test how well different LLMs capture Marin's personality:
+
+```bash
+# Run the benchmark
+python3 scripts/vibe_benchmark.py
+
+# List available categories
+python3 scripts/vibe_benchmark.py --list-categories
+```
+
+This script runs a series of conversation tests and uses an LLM-as-a-Judge to evaluate the "vibe" against Marin's persona guidelines.
+
 ### Project Structure
 
 | Package | Purpose |
