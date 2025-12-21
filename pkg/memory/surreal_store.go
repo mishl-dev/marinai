@@ -497,6 +497,11 @@ func (s *SurrealStore) UpdateReminder(reminder Reminder) error {
 		parts := strings.SplitN(reminder.ID, ":", 2)
 		tb = parts[0]
 		key = parts[1]
+
+		// Security: Ensure we are only updating the reminders table
+		if tb != "reminders" {
+			return fmt.Errorf("security error: attempting to update invalid table '%s' via UpdateReminder", tb)
+		}
 	} else {
 		tb = "reminders"
 		key = reminder.ID
