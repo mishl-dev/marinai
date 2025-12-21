@@ -84,8 +84,9 @@ type Response struct {
 
 // APIError captures non-200 responses to allow inspection of the status code.
 type APIError struct {
-	StatusCode int
-	Body       string
+	StatusCode     int
+	Body           string
+	RequestPreview string
 }
 
 func (e *APIError) Error() string {
@@ -93,7 +94,11 @@ func (e *APIError) Error() string {
 	if len(body) > 200 {
 		body = body[:200] + "...(truncated)"
 	}
-	return fmt.Sprintf("api status %d: %s", e.StatusCode, body)
+	msg := fmt.Sprintf("api status %d: %s", e.StatusCode, body)
+	if e.RequestPreview != "" {
+		msg += fmt.Sprintf(" | Request: %s", e.RequestPreview)
+	}
+	return msg
 }
 
 // NewClient creates a client with support for multiple API keys (comma-separated)
@@ -217,7 +222,13 @@ func (c *Client) ChatCompletion(messages []Message) (string, error) {
 			}
 			// Sanitize newlines to keep logs clean
 			bodyPreview = strings.ReplaceAll(bodyPreview, "\n", " ")
-			log.Printf("Warning: Model %s failed (status %d): %s", modelConf.ID, apiErr.StatusCode, bodyPreview)
+
+			// Log with request context if available
+			reqContext := ""
+			if apiErr.RequestPreview != "" {
+				reqContext = fmt.Sprintf(" | Req: %s", apiErr.RequestPreview)
+			}
+			log.Printf("Warning: Model %s failed (status %d): %s%s", modelConf.ID, apiErr.StatusCode, bodyPreview, reqContext)
 
 			if apiErr.StatusCode == 429 || apiErr.StatusCode == 401 || apiErr.StatusCode == 403 {
 				c.recordFailure(keyState)
@@ -274,9 +285,17 @@ func (c *Client) makeRequestWithKey(reqBody Request, apiKey string) (string, Usa
 	// This triggers the loop in ChatCompletion to try the next model.
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		bodyBytes, _ := io.ReadAll(resp.Body)
+
+		// Create a preview of the request body for context
+		reqPreview := string(jsonBody)
+		if len(reqPreview) > 500 {
+			reqPreview = reqPreview[:500] + "...(truncated)"
+		}
+
 		return "", Usage{}, &APIError{
-			StatusCode: resp.StatusCode,
-			Body:       string(bodyBytes),
+			StatusCode:     resp.StatusCode,
+			Body:           string(bodyBytes),
+			RequestPreview: reqPreview,
 		}
 	}
 
