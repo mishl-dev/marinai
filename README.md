@@ -314,6 +314,9 @@ We include a helper script to verify your development environment:
 
 # Run all tests (including long running ones)
 ./scripts/dev-check.sh --all
+
+# Scaffold a new slash command
+./scripts/scaffold-command.sh <command-name> "Description of the command"
 ```
 
 ### Project Structure
