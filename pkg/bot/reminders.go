@@ -24,31 +24,44 @@ func (h *Handler) checkReminders() {
 
 		reminders, err := h.memoryStore.GetDueReminders()
 		if err != nil {
-			log.Printf("Error getting reminders: %v", err)
+			log.Printf("[Reminders] Error getting reminders: %v", err)
 			continue
 		}
 
+		if len(reminders) == 0 {
+			continue
+		}
+
+		batchStart := time.Now()
+		log.Printf("[Reminders] Starting processing of %d reminders", len(reminders))
+
+		processedCount := 0
 		for _, r := range reminders {
 			// Process each reminder
 			if err := h.processReminder(r); err != nil {
-				log.Printf("Error processing reminder %s: %v. Retrying in 1 hour.", r.ID, err)
+				log.Printf("[Reminders] Error processing reminder %s: %v. Retrying in 1 hour.", r.ID, err)
 				// Retry in 1 hour to avoid loop
 				r.DueAt += 3600
 				if updateErr := h.memoryStore.UpdateReminder(r); updateErr != nil {
-					log.Printf("Error updating reminder %s: %v", r.ID, updateErr)
+					log.Printf("[Reminders] Error updating reminder %s: %v", r.ID, updateErr)
 				}
 				continue
 			}
 
 			// Delete reminder after successful processing
 			if err := h.memoryStore.DeleteReminder(r.ID); err != nil {
-				log.Printf("Error deleting reminder %s: %v", r.ID, err)
+				log.Printf("[Reminders] Error deleting reminder %s: %v", r.ID, err)
 			}
+			processedCount++
 		}
+
+		log.Printf("[Reminders] Batch complete: processed %d/%d reminders in %v", processedCount, len(reminders), time.Since(batchStart))
 	}
 }
 
 func (h *Handler) processReminder(r memory.Reminder) error {
+	start := time.Now()
+
 	// 1. Generate contextual message
 	user, err := h.session.User(r.UserID)
 	userName := "User"
@@ -93,6 +106,6 @@ func (h *Handler) processReminder(r memory.Reminder) error {
 		return fmt.Errorf("error sending message: %w", err)
 	}
 
-	log.Printf("Sent reminder to %s about '%s'", userName, r.Text)
+	log.Printf("[Reminders] Sent to %s: '%s' (processed in %v)", userName, r.Text, time.Since(start))
 	return nil
 }
