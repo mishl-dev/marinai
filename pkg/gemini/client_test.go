@@ -68,7 +68,7 @@ func TestDescribeImageFromURL(t *testing.T) {
 	// Initialize client
 	client := NewClient("test-key")
 	client.apiURL = geminiServer.URL + "/v1beta/models/gemini-flash-lite-latest:generateContent"
-	client.allowLocalIPs = true // Enable testing with local server
+	client.SetAllowLocalIPs(true) // Enable testing with local server
 
 	// Test DescribeImageFromURL (Happy Path)
 	desc, err := client.DescribeImageFromURL(imageServer.URL + "/image.png")
@@ -80,7 +80,7 @@ func TestDescribeImageFromURL(t *testing.T) {
 func TestDescribeImageFromURL_SSRF(t *testing.T) {
 	// Initialize client
 	client := NewClient("test-key")
-	client.allowLocalIPs = false // Explicitly enable security checks
+	client.SetAllowLocalIPs(false) // Explicitly enable security checks
 
 	// Test Localhost Access Blocking
 	// We can use any localhost URL, it doesn't need to exist because validation happens first
@@ -146,6 +146,7 @@ func TestClassify(t *testing.T) {
 	// Initialize client
 	client := NewClient("test-key")
 	client.apiURL = geminiServer.URL + "/v1beta/models/gemini-flash-lite-latest:generateContent"
+	client.SetAllowLocalIPs(true) // Fix: explicitly allow local IPs for mock server
 
 	// Test Classify
 	label, confidence, err := client.Classify("some text", []string{"label1", "label2"})
@@ -193,6 +194,7 @@ func TestClassify_InvalidJSON(t *testing.T) {
 	// Initialize client
 	client := NewClient("test-key")
 	client.apiURL = geminiServer.URL + "/v1beta/models/gemini-flash-lite-latest:generateContent"
+	client.SetAllowLocalIPs(true) // Fix: explicitly allow local IPs for mock server
 
 	// Test Classify fallback
 	labels := []string{"label1", "label2"}

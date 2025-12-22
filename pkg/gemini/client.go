@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -20,9 +21,59 @@ const (
 // Client handles image understanding via Gemini Vision API
 type Client struct {
 	apiKey        string
-	client        *http.Client
+	client        *http.Client // For API calls (trusted)
+	safeClient    *http.Client // For User URLs (untrusted - SSRF protected)
 	apiURL        string
 	allowLocalIPs bool // For testing purposes only
+}
+
+// safeTransport returns an http.Transport with a DialContext that prevents SSRF
+func safeTransport(allowLocalIPs bool) *http.Transport {
+	return &http.Transport{
+		Proxy: nil, // Security: Disable proxies for untrusted fetches to ensure we control resolution
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid address: %w", err)
+			}
+
+			// Resolve IPs
+			ips, err := net.LookupIP(host)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve host: %w", err)
+			}
+
+			var safeIP net.IP
+			// Check all resolved IPs
+			for _, ip := range ips {
+				if !allowLocalIPs {
+					if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
+						continue // Skip dangerous IPs
+					}
+				}
+				// Found a safe IP (or we allow unsafe ones)
+				safeIP = ip
+				break
+			}
+
+			if safeIP == nil {
+				return nil, fmt.Errorf("blocked access to restricted IP(s) for host: %s", host)
+			}
+
+			// Dial the specific Safe IP
+			dialer := &net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}
+
+			targetAddr := net.JoinHostPort(safeIP.String(), port)
+
+			return dialer.DialContext(ctx, network, targetAddr)
+		},
+		TLSHandshakeTimeout: 10 * time.Second,
+		MaxIdleConns:        10,
+		IdleConnTimeout:     90 * time.Second,
+	}
 }
 
 // NewClient creates a new Gemini Vision client
@@ -31,10 +82,27 @@ func NewClient(apiKey string) *Client {
 		apiKey: apiKey,
 		client: &http.Client{
 			Timeout: 90 * time.Second,
+			// Default transport handles Proxies and DNS normally
+		},
+		safeClient: &http.Client{
+			Timeout:   90 * time.Second,
+			Transport: safeTransport(false), // Default to strict SSRF protection
 		},
 		apiURL:        defaultGeminiAPIURL,
 		allowLocalIPs: false,
 	}
+}
+
+// SetAllowLocalIPs enables/disables local IP access (for testing)
+func (c *Client) SetAllowLocalIPs(allow bool) {
+	c.allowLocalIPs = allow
+	// Update the safe client transport
+	c.safeClient.Transport = safeTransport(allow)
+	// For testing API mocks on localhost, we also need to allow the main client to talk to localhost
+	// In a real scenario, API calls are trusted, but testing involves redirects or local servers.
+	// Since c.client uses default transport, it follows system rules (allows localhost).
+	// But if we want to test SSRF logic, we manipulate safeClient.
+	// If we want to test API logic with local mock, c.client works fine by default.
 }
 
 // ImageDescription represents the result of analyzing an image
@@ -139,7 +207,7 @@ If there's text in the image, mention what it says.`
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// Make the request
+	// Make the request using the TRUSTED client (c.client)
 	url := fmt.Sprintf("%s?key=%s", c.apiURL, c.apiKey)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
@@ -210,47 +278,23 @@ If there's text in the image, mention what it says.`
 	}, nil
 }
 
-// validateURL checks if the URL is safe to fetch (SSRF protection)
-func (c *Client) validateURL(rawURL string) error {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return fmt.Errorf("invalid URL: %w", err)
-	}
-
-	// Ensure scheme is http or https
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("unsupported scheme: %s", u.Scheme)
-	}
-
-	// Resolve the host to IP addresses
-	host := u.Hostname()
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		return fmt.Errorf("failed to resolve host: %w", err)
-	}
-
-	// Check if any IP is private, loopback, or link-local
-	for _, ip := range ips {
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
-			return fmt.Errorf("blocked access to restricted IP: %s", ip.String())
-		}
-	}
-
-	return nil
-}
-
 // DescribeImageFromURL fetches an image from a URL and describes it
 func (c *Client) DescribeImageFromURL(imageURL string) (*ImageDescription, error) {
-	// Security: Validate URL before fetching to prevent SSRF
-	// Skip validation if testing with local IPs explicitly allowed
-	if !c.allowLocalIPs {
-		if err := c.validateURL(imageURL); err != nil {
-			return nil, fmt.Errorf("security validation failed: %w", err)
-		}
+	// Security: Use the UNTRUSTED safeClient which implements SSRF protection via DialContext.
+	// It resolves the IP, checks if it's private (unless allowed), and dials the IP directly.
+	// This prevents DNS Rebinding attacks.
+
+	// We still check scheme validation here as DialContext doesn't see schemes.
+	u, err := url.Parse(imageURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported scheme: %s", u.Scheme)
 	}
 
-	// Fetch the image
-	resp, err := c.client.Get(imageURL)
+	// Fetch the image using SAFE client
+	resp, err := c.safeClient.Get(imageURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch image: %w", err)
 	}
@@ -328,6 +372,7 @@ Output ONLY valid JSON. Example: {"label": "neutral", "confidence": 0.85}`, labe
 		return "", 0, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
+	// Use TRUSTED client (c.client)
 	url := fmt.Sprintf("%s?key=%s", c.apiURL, c.apiKey)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
