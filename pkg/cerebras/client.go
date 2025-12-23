@@ -369,6 +369,8 @@ Output ONLY valid JSON. Example: {"label": "neutral", "confidence": 0.85}`, labe
 		Confidence float64 `json:"confidence"`
 	}
 	if err := json.Unmarshal([]byte(responseText), &result); err != nil {
+		// Log the error and raw response for debugging
+		log.Printf("[Classify] Failed to parse JSON: %v. Raw output: %s", err, responseText)
 		// If JSON parsing fails, return the first label as fallback
 		return labels[0], 0.5, nil
 	}
