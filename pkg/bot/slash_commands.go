@@ -78,12 +78,8 @@ func handleResetCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 // handleResetConfirm handles the confirmation of memory reset
 func handleResetConfirm(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
 	// Get user ID
-	var userID string
-	if i.Member != nil {
-		userID = i.Member.User.ID
-	} else if i.User != nil {
-		userID = i.User.ID
-	} else {
+	userID, _, _ := getUserFromInteraction(i)
+	if userID == "" {
 		log.Printf("Error: Could not determine user ID for reset confirm")
 		return
 	}
@@ -129,21 +125,8 @@ func handleResetCancel(h *Handler, s *discordgo.Session, i *discordgo.Interactio
 // handleStatsCommand handles the /stats slash command - shows what Marin remembers
 func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
 	// Get user ID
-	var userID string
-	var userName string
-	if i.Member != nil {
-		userID = i.Member.User.ID
-		userName = i.Member.User.Username
-		if i.Member.User.GlobalName != "" {
-			userName = i.Member.User.GlobalName
-		}
-	} else if i.User != nil {
-		userID = i.User.ID
-		userName = i.User.Username
-		if i.User.GlobalName != "" {
-			userName = i.User.GlobalName
-		}
-	} else {
+	userID, userName, userAvatar := getUserFromInteraction(i)
+	if userID == "" {
 		log.Printf("Error: Could not determine user ID for stats command")
 		return
 	}
@@ -170,6 +153,9 @@ func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 			Title:       fmt.Sprintf("📝 Memory File: %s", userName),
 			Description: "I don't have any specific notes about you yet!",
 			Color:       0x00BFFF, // Deep Sky Blue
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
+				URL: userAvatar,
+			},
 			Fields: []*discordgo.MessageEmbedField{
 				{
 					Name: "How to help me remember:",
@@ -200,6 +186,9 @@ func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 			Title:       fmt.Sprintf("📝 Memory File: %s", userName),
 			Description: "Here's everything I've noted down about you so far!",
 			Color:       0x00BFFF, // Deep Sky Blue
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
+				URL: userAvatar,
+			},
 			Fields: []*discordgo.MessageEmbedField{
 				{
 					Name:   "Observations",
@@ -335,7 +324,7 @@ func handleMoodRefresh(h *Handler, s *discordgo.Session, i *discordgo.Interactio
 }
 
 // buildAffectionEmbed creates the embed for the affection display
-func buildAffectionEmbed(h *Handler, userID, userName string) *discordgo.MessageEmbed {
+func buildAffectionEmbed(h *Handler, userID, userName, userAvatar string) *discordgo.MessageEmbed {
 	affection, level := h.GetUserAffection(userID)
 	streak, _ := h.memoryStore.GetStreak(userID)
 
@@ -371,6 +360,9 @@ func buildAffectionEmbed(h *Handler, userID, userName string) *discordgo.Message
 		Title:       fmt.Sprintf("💕 Relationship with %s", userName),
 		Description: flavorText,
 		Color:       0xFF69B4, // Hot Pink
+		Thumbnail: &discordgo.MessageEmbedThumbnail{
+			URL: userAvatar,
+		},
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:   "Current Status",
@@ -387,26 +379,13 @@ func buildAffectionEmbed(h *Handler, userID, userName string) *discordgo.Message
 // handleAffectionCommand handles the /affection slash command
 func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
 	// Get user ID
-	var userID string
-	var userName string
-	if i.Member != nil {
-		userID = i.Member.User.ID
-		userName = i.Member.User.Username
-		if i.Member.User.GlobalName != "" {
-			userName = i.Member.User.GlobalName
-		}
-	} else if i.User != nil {
-		userID = i.User.ID
-		userName = i.User.Username
-		if i.User.GlobalName != "" {
-			userName = i.User.GlobalName
-		}
-	} else {
+	userID, userName, userAvatar := getUserFromInteraction(i)
+	if userID == "" {
 		log.Printf("Error: Could not determine user ID for affection command")
 		return
 	}
 
-	embed := buildAffectionEmbed(h, userID, userName)
+	embed := buildAffectionEmbed(h, userID, userName, userAvatar)
 
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -438,26 +417,13 @@ func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.Inter
 // handleAffectionRefresh updates the existing affection message
 func handleAffectionRefresh(h *Handler, s *discordgo.Session, i *discordgo.InteractionCreate) {
 	// Get user ID (refresh button interaction also has user info)
-	var userID string
-	var userName string
-	if i.Member != nil {
-		userID = i.Member.User.ID
-		userName = i.Member.User.Username
-		if i.Member.User.GlobalName != "" {
-			userName = i.Member.User.GlobalName
-		}
-	} else if i.User != nil {
-		userID = i.User.ID
-		userName = i.User.Username
-		if i.User.GlobalName != "" {
-			userName = i.User.GlobalName
-		}
-	} else {
+	userID, userName, userAvatar := getUserFromInteraction(i)
+	if userID == "" {
 		log.Printf("Error: Could not determine user ID for affection refresh")
 		return
 	}
 
-	embed := buildAffectionEmbed(h, userID, userName)
+	embed := buildAffectionEmbed(h, userID, userName, userAvatar)
 
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseUpdateMessage,
@@ -576,4 +542,23 @@ func getSleepTimeRemaining() string {
 		return fmt.Sprintf("💤 *wakes up in ~%dh %dm*", hours, minutes)
 	}
 	return fmt.Sprintf("💤 *wakes up in ~%dm*", minutes)
+}
+
+// getUserFromInteraction extracts user ID, name, and avatar from an interaction
+func getUserFromInteraction(i *discordgo.InteractionCreate) (string, string, string) {
+	if i.Member != nil {
+		name := i.Member.User.GlobalName
+		if name == "" {
+			name = i.Member.User.Username
+		}
+		return i.Member.User.ID, name, i.Member.User.AvatarURL("")
+	}
+	if i.User != nil {
+		name := i.User.GlobalName
+		if name == "" {
+			name = i.User.Username
+		}
+		return i.User.ID, name, i.User.AvatarURL("")
+	}
+	return "", "", ""
 }
