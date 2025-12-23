@@ -105,9 +105,10 @@ Marin has different moods that cycle naturally and affect her responses:
 
 ### 💌 Boredom DMs (Duolingo-style)
 - If you haven't talked to Marin in 1+ day, she might DM you
-- "hey... haven't heard from you in a while..."
-- Won't spam — only one pending DM at a time
-- Responding to her DM gives bonus affection!
+- Uses **smart exponential backoff** (1 day → 2 days → 4 days)
+- She'll try to reach you up to 4 times with increasingly dramatic messages
+- Won't spam indefinitely — she'll eventually give up until you return
+- Responding to her DM gives massive bonus affection!
 
 ### 🎭 Personality Quirks
 Marin has a strong sense of self and won't just do whatever you say:
