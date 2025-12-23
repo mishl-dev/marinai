@@ -209,6 +209,10 @@ func (m *mockMemoryStore) GetPendingDMInfo(userID string) (time.Time, int, bool,
 	return time.Time{}, 0, false, nil
 }
 
+func (m *mockMemoryStore) GetPendingDMs() (map[string]memory.PendingDMInfo, error) {
+	return map[string]memory.PendingDMInfo{}, nil
+}
+
 func (m *mockMemoryStore) SetPendingDM(userID string, sentAt time.Time) error {
 	return nil
 }
@@ -219,6 +223,10 @@ func (m *mockMemoryStore) ClearPendingDM(userID string) error {
 
 func (m *mockMemoryStore) GetLastInteraction(userID string) (time.Time, error) {
 	return time.Time{}, nil
+}
+
+func (m *mockMemoryStore) GetInactiveUsers(cutoff time.Time) ([]string, error) {
+	return []string{}, nil
 }
 
 func (m *mockMemoryStore) SetLastInteraction(userID string, timestamp time.Time) error {
@@ -404,7 +412,7 @@ func TestMessageFlow(t *testing.T) {
 			}
 			promptBuilder.WriteString(fmt.Sprintf("[%s]\n%s\n", role, msg.Content))
 
-			if strings.Contains(msg.Content, "Task: Analyze the interaction and output a JSON object with") {
+			if strings.Contains(msg.Content, "Analyze the interaction and output a JSON object with") {
 				isMemoryEvaluation = true
 			}
 			// Detect sentiment analysis calls from analyzeInteractionBehavior

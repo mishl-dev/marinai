@@ -56,60 +56,67 @@ func (h *Handler) performLonelinessCheck() bool {
 		return false
 	}
 
-	// 2. Get all known users
-	users, err := h.memoryStore.GetAllKnownUsers()
+	// 2. Get pending DMs (Batch 1) - Small number of users
+	pendingDMs, err := h.memoryStore.GetPendingDMs()
 	if err != nil {
-		log.Printf("Error getting known users: %v", err)
+		log.Printf("Error getting pending DMs: %v", err)
 		return false
 	}
 
-	if len(users) == 0 {
+	// 3. Get inactive users (Batch 2) - Users who haven't interacted in 24h
+	cutoff := time.Now().Add(-inactivityThreshold)
+	inactiveUsers, err := h.memoryStore.GetInactiveUsers(cutoff)
+	if err != nil {
+		log.Printf("Error getting inactive users: %v", err)
 		return false
 	}
 
-	// 3. Filter candidates using exponential backoff
+	// 4. Combine and Filter candidates using exponential backoff
+	eligibleMap := make(map[string]bool)
+
+	// A. Process Pending DMs (Existing tracks)
+	for userID, info := range pendingDMs {
+		// Cap at 4 DMs
+		if info.DMCount >= 4 {
+			log.Printf("User %s: max DMs reached (%d), giving up until they respond", userID, info.DMCount)
+			continue
+		}
+
+		// Check backoff
+		backoffDuration := getBackoffDuration(info.DMCount)
+		timeSinceDM := time.Since(info.SentAt)
+
+		if timeSinceDM < backoffDuration {
+			// Not enough time has passed
+			log.Printf("User %s: backoff active (DM #%d, wait %.1f more hours)",
+				userID, info.DMCount, (backoffDuration - timeSinceDM).Hours())
+			continue
+		}
+
+		// Backoff expired, eligible!
+		log.Printf("User %s: backoff expired (DM #%d), eligible for next DM", userID, info.DMCount)
+		eligibleMap[userID] = true
+	}
+
+	// B. Process Inactive Users (New tracks)
+	// These users have no pending DM (or we would have seen them above) AND are inactive
+	for _, userID := range inactiveUsers {
+		// If they already have a pending DM, they are handled in loop A
+		if _, exists := pendingDMs[userID]; exists {
+			continue
+		}
+		// If not in pending, and inactive > 24h (guaranteed by query), they are eligible
+		eligibleMap[userID] = true
+	}
+
+	if len(eligibleMap) == 0 {
+		log.Println("No eligible users for boredom DM (all in backoff or were active recently)")
+		return false
+	}
+
 	var eligibleUsers []string
-	for _, userID := range users {
-		// Check pending DM info for exponential backoff
-		sentAt, dmCount, hasPending, err := h.memoryStore.GetPendingDMInfo(userID)
-		if err != nil {
-			log.Printf("Error checking pending DM for %s: %v", userID, err)
-			continue
-		}
-
-		if hasPending {
-			// Cap at 4 DMs - after that, stop trying until user responds
-			if dmCount >= 4 {
-				log.Printf("User %s: max DMs reached (%d), giving up until they respond", userID, dmCount)
-				continue
-			}
-
-			// Check if enough time has passed based on backoff schedule
-			backoffDuration := getBackoffDuration(dmCount)
-			timeSinceDM := time.Since(sentAt)
-
-			if timeSinceDM < backoffDuration {
-				// Not enough time has passed, skip this user
-				log.Printf("User %s: backoff active (DM #%d, wait %.1f more hours)",
-					userID, dmCount, (backoffDuration - timeSinceDM).Hours())
-				continue
-			}
-			// Backoff period expired, user is eligible for another DM
-			log.Printf("User %s: backoff expired (DM #%d), eligible for next DM", userID, dmCount)
-		}
-
-		// Check last interaction time
-		lastInteraction, err := h.memoryStore.GetLastInteraction(userID)
-		if err != nil {
-			log.Printf("Error getting last interaction for %s: %v", userID, err)
-			continue
-		}
-
-		// If never interacted (zero time), they're eligible
-		// Otherwise check if they've been inactive for 1+ day
-		if lastInteraction.IsZero() || time.Since(lastInteraction) > inactivityThreshold {
-			eligibleUsers = append(eligibleUsers, userID)
-		}
+	for userID := range eligibleMap {
+		eligibleUsers = append(eligibleUsers, userID)
 	}
 
 	if len(eligibleUsers) == 0 {

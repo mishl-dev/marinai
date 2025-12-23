@@ -102,6 +102,7 @@ func (s *SurrealStore) Init() error {
 		"DEFINE FIELD IF NOT EXISTS streak ON user_profiles TYPE int DEFAULT 0",
 		"DEFINE FIELD IF NOT EXISTS last_streak_date ON user_profiles TYPE string DEFAULT ''",
 		"DEFINE INDEX IF NOT EXISTS user_id_idx ON user_profiles FIELDS user_id",
+		"DEFINE INDEX IF NOT EXISTS last_interaction_idx ON user_profiles FIELDS last_interaction",
 
 		// -- Guild Cache --
 		"DEFINE FIELD IF NOT EXISTS emojis ON guild_cache TYPE array<string>",
@@ -831,6 +832,61 @@ func (s *SurrealStore) GetPendingDMInfo(userID string) (sentAt time.Time, dmCoun
 	return time.Time{}, 0, false, nil
 }
 
+// GetPendingDMs returns all pending DMs
+func (s *SurrealStore) GetPendingDMs() (map[string]PendingDMInfo, error) {
+	query := `SELECT user_id, sent_at, dm_count FROM pending_dm;`
+	result, err := s.client.Query(query, map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+
+	rows, ok := result.([]interface{})
+	if !ok {
+		return map[string]PendingDMInfo{}, nil
+	}
+
+	pendingDMs := make(map[string]PendingDMInfo)
+	for _, r := range rows {
+		if row, ok := r.(map[string]interface{}); ok {
+			userID, ok := row["user_id"].(string)
+			if !ok {
+				continue
+			}
+
+			// Parse sent_at
+			var timestamp int64
+			switch t := row["sent_at"].(type) {
+			case float64:
+				timestamp = int64(t)
+			case int64:
+				timestamp = t
+			case int:
+				timestamp = int64(t)
+			}
+
+			// Parse dm_count
+			var count int
+			switch c := row["dm_count"].(type) {
+			case float64:
+				count = int(c)
+			case int64:
+				count = int(c)
+			case int:
+				count = c
+			case nil:
+				count = 1 // Default if not set
+			}
+
+			pendingDMs[userID] = PendingDMInfo{
+				SentAt:  time.Unix(timestamp, 0),
+				DMCount: count,
+			}
+		}
+	}
+
+	return pendingDMs, nil
+}
+
 // SetPendingDM marks that a boredom DM was sent and increments the count
 func (s *SurrealStore) SetPendingDM(userID string, sentAt time.Time) error {
 	// First check if record exists to increment count
@@ -891,6 +947,38 @@ func (s *SurrealStore) GetLastInteraction(userID string) (time.Time, error) {
 	}
 
 	return time.Time{}, nil
+}
+
+// GetInactiveUsers returns users who haven't interacted since the cutoff time
+func (s *SurrealStore) GetInactiveUsers(cutoff time.Time) ([]string, error) {
+	// Query using the index on last_interaction
+	// We want users where last_interaction < cutoff
+	// OR last_interaction is 0/none (if we want to include them, but usually inactivity check implies they were once active)
+	// For loneliness check, we usually care about people we haven't heard from recently.
+
+	query := `SELECT VALUE user_id FROM user_profiles WHERE last_interaction < $cutoff;`
+	result, err := s.client.Query(query, map[string]interface{}{
+		"cutoff": cutoff.Unix(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if strList, ok := result.([]string); ok {
+		return strList, nil
+	}
+
+	if list, ok := result.([]interface{}); ok {
+		users := make([]string, 0, len(list))
+		for _, item := range list {
+			if str, ok := item.(string); ok {
+				users = append(users, str)
+			}
+		}
+		return users, nil
+	}
+
+	return []string{}, nil
 }
 
 // SetLastInteraction updates the user's last interaction timestamp
