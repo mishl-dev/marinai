@@ -42,6 +42,11 @@ type Reminder struct {
 	CreatedAt int64  `json:"created_at"`
 }
 
+type PendingDMInfo struct {
+	SentAt  time.Time `json:"sent_at"`
+	DMCount int       `json:"dm_count"`
+}
+
 // DelayedThought represents a thought Marin will send later (conversation continuation)
 type DelayedThought struct {
 	ID             string `json:"id,omitempty"`
@@ -90,9 +95,11 @@ type Store interface {
 	// Pending DM tracking (with exponential backoff)
 	HasPendingDM(userID string) (bool, error)
 	GetPendingDMInfo(userID string) (sentAt time.Time, dmCount int, exists bool, err error)
+	GetPendingDMs() (map[string]PendingDMInfo, error)
 	SetPendingDM(userID string, sentAt time.Time) error
 	ClearPendingDM(userID string) error
 	GetLastInteraction(userID string) (time.Time, error)
+	GetInactiveUsers(cutoff time.Time) ([]string, error)
 	SetLastInteraction(userID string, timestamp time.Time) error
 
 	// Affection System
@@ -407,6 +414,10 @@ func (vs *FileStore) GetPendingDMInfo(userID string) (time.Time, int, bool, erro
 	return time.Time{}, 0, false, nil
 }
 
+func (vs *FileStore) GetPendingDMs() (map[string]PendingDMInfo, error) {
+	return map[string]PendingDMInfo{}, nil
+}
+
 func (vs *FileStore) SetPendingDM(userID string, sentAt time.Time) error {
 	return nil
 }
@@ -417,6 +428,10 @@ func (vs *FileStore) ClearPendingDM(userID string) error {
 
 func (vs *FileStore) GetLastInteraction(userID string) (time.Time, error) {
 	return time.Time{}, nil
+}
+
+func (vs *FileStore) GetInactiveUsers(cutoff time.Time) ([]string, error) {
+	return []string{}, nil
 }
 
 func (vs *FileStore) SetLastInteraction(userID string, timestamp time.Time) error {
