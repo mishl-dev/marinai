@@ -26,5 +26,5 @@ func TestSystemPromptFormatting(t *testing.T) {
 	assert.Contains(t, formatted, "TestProfile")
 
 	// Verify the literal "100%" is preserved (as "100%")
-	assert.Contains(t, formatted, "match them 100%")
+	assert.Contains(t, formatted, "Match the user 100%")
 }
