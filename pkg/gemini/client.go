@@ -176,15 +176,17 @@ func (c *Client) DescribeImage(imageData []byte, mimeType string) (*ImageDescrip
 	encodedImage := base64.StdEncoding.EncodeToString(imageData)
 
 	// Build the request
-	prompt := `You are helping describe an image for a chatbot.
-Describe this image in 2-3 natural sentences as if you're telling a friend what you see.
-Focus on:
-- What's in the image (people, objects, scenes, text)
-- The mood/vibe (cute, aesthetic, funny, etc.)
+	prompt := `Provide a natural, vivid description of this image for a conversational AI interface. 
+Your description should help a user understand both the literal content and the overall "vibe."
 
-Keep it casual and brief. Don't start with "This image shows" - just describe it naturally.
-If it's a selfie or person photo, describe their appearance/outfit/vibe.
-If there's text in the image, mention what it says.`
+Instructions:
+- Decribe and text or symbols
+- Describe the primary subjects, their actions, and the environment.
+- Capture the mood, lighting, and aesthetic (e.g., "cozy rainy day," "neon-lit cyberpunk feel").
+- For people, describe their appearance, clothing, and expressions naturally.
+- Transcribe any legible text and mention its context.
+- Keep it to 2-4 sentences in a casual, friendly tone.
+- Start directly with the description—avoid "This image shows" or "I see."`
 
 	reqBody := geminiRequest{
 		Contents: []geminiContent{
