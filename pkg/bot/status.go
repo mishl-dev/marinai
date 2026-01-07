@@ -47,10 +47,10 @@ var TimeBasedStatuses = map[string][]StatusEntry{
 	},
 	"latenight": { // 12am - 6am
 		{Text: "still up lol", Emoji: "👀"},
-		{Text: "zzz...", Emoji: "😴"},
+		{Text: "late night grind", Emoji: "🌙"},
 		{Text: "insomnia hours", Emoji: "🌙"},
 		{Text: "3am thoughts", Emoji: "💭"},
-		{Text: "sleeping...", Emoji: "😴"},
+		{Text: "night owl mode", Emoji: "🦉"},
 	},
 }
 

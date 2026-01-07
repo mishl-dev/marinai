@@ -135,8 +135,6 @@ func (h *Handler) evaluateReaction(s Session, channelID, messageID, content stri
 	switch mood {
 	case MoodHyper:
 		reactionChance = 0.7 // More reactive when hyper
-	case MoodSleepy:
-		reactionChance = 0.2 // Less reactive when sleepy
 	case MoodBored:
 		reactionChance = 0.5 // Slightly more reactive when bored (something to do)
 	case MoodFlirty:

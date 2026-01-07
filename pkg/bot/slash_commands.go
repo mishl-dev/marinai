@@ -231,10 +231,6 @@ func buildMoodEmbed(h *Handler) *discordgo.MessageEmbed {
 	switch mood {
 	case MoodHyper:
 		flavorText = "*bounces around excitedly*"
-	case MoodSleepy:
-		flavorText = "*yawns*"
-
-		flavorText += "\n\n" + getSleepTimeRemaining()
 	case MoodFlirty:
 		flavorText = "😏"
 	case MoodNostalgic:
@@ -514,34 +510,6 @@ func UnregisterSlashCommands(s *discordgo.Session, guildID string, commands []*d
 	}
 
 	return nil
-}
-
-// getSleepTimeRemaining calculates how long until Marin wakes up (3am Tokyo time)
-func getSleepTimeRemaining() string {
-	// Tokyo timezone
-	loc := time.FixedZone("Asia/Tokyo", 9*60*60)
-	now := time.Now().In(loc)
-	hour := now.Hour()
-
-	// SLEEPY is from 12am (0) to 3am
-	// Calculate time until 3am
-	var wakeUpTime time.Time
-	if hour >= 0 && hour < 3 {
-		// Same day, wake up at 3am
-		wakeUpTime = time.Date(now.Year(), now.Month(), now.Day(), 3, 0, 0, 0, loc)
-	} else {
-		// Already past 3am, shouldn't be sleepy but handle edge case
-		return "zzz..."
-	}
-
-	remaining := wakeUpTime.Sub(now)
-	hours := int(remaining.Hours())
-	minutes := int(remaining.Minutes()) % 60
-
-	if hours > 0 {
-		return fmt.Sprintf("💤 *wakes up in ~%dh %dm*", hours, minutes)
-	}
-	return fmt.Sprintf("💤 *wakes up in ~%dm*", minutes)
 }
 
 // getUserFromInteraction extracts user ID, name, and avatar from an interaction

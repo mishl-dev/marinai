@@ -35,8 +35,6 @@ func CalculateTypingDuration(messageLength int, mood string, config TypingConfig
 	switch mood {
 	case MoodHyper:
 		moodMultiplier = 0.6 // Types fast when hyper
-	case MoodSleepy:
-		moodMultiplier = 1.5 // Types slow when sleepy
 	case MoodFlirty:
 		moodMultiplier = 1.1 // Takes a moment to think of something clever
 	case MoodFocused:

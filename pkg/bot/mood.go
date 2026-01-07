@@ -10,7 +10,6 @@ import (
 const (
 	MoodHappy     = "HAPPY"
 	MoodHyper     = "HYPER"
-	MoodSleepy    = "SLEEPY"
 	MoodBored     = "BORED"
 	MoodFlirty    = "FLIRTY"
 	MoodFocused   = "FOCUSED"
@@ -21,7 +20,6 @@ const (
 var MoodEmojis = map[string]string{
 	MoodHappy:     "😊",
 	MoodHyper:     "⚡",
-	MoodSleepy:    "😴",
 	MoodBored:     "😐",
 	MoodFlirty:    "💋",
 	MoodFocused:   "🎯",
@@ -32,7 +30,6 @@ var MoodEmojis = map[string]string{
 var MoodDescriptions = map[string]string{
 	MoodHappy:     "feeling good rn~",
 	MoodHyper:     "omg so much energy rn",
-	MoodSleepy:    "so tired... need sleep",
 	MoodBored:     "kinda bored tbh",
 	MoodFlirty:    "feeling a lil spicy~",
 	MoodFocused:   "working on smth rn",
@@ -43,7 +40,6 @@ var MoodDescriptions = map[string]string{
 var MoodColors = map[string]int{
 	MoodHappy:     0xFFD700, // Gold
 	MoodHyper:     0xFF4500, // Orange Red
-	MoodSleepy:    0xADD8E6, // Light Blue
 	MoodBored:     0x808080, // Gray
 	MoodFlirty:    0xFF69B4, // Hot Pink
 	MoodFocused:   0x4169E1, // Royal Blue
@@ -69,17 +65,6 @@ You're feeling energetic and excitable. Talk a bit faster, be more enthusiastic.
 <style>
 Maybe repeat yourself or trail off mid-thought cuz you're so hyped. Still keep it short.
 </style>`,
-
-	MoodSleepy: `Current Mood: SLEEPY
-# CONTEXT
-<vibe>
-You are barely awake. You are too tired to frame complete thoughts.
-</vibe>
-<style>
-Write VERY short messages (1-4 words). Misspell words constantly. Slur your words (e.g. "sso sleepy", "cnt type rn"). 
-</style>
-# CONSTRAINT
-DO NOT simply say "yawn" repeatedly.`,
 
 	MoodBored: `Current Mood: BORED
 # CONTEXT
@@ -163,12 +148,7 @@ func (h *Handler) runMoodLoop() {
 func (h *Handler) determineMood(messageRate int, hour int, dayOfWeek time.Weekday) string {
 	// Priority order of mood determination
 
-	// 1. Late night nap = SLEEPY (12am - 3am)
-	if hour >= 0 && hour < 3 {
-		return MoodSleepy
-	}
-
-	// 2. Very high activity = HYPER
+	// 1. Very high activity = HYPER
 	if messageRate > 20 {
 		return MoodHyper
 	}

@@ -95,7 +95,6 @@ var AffectionPenalties = map[string]int{
 var MoodAffectionMultipliers = map[string]float64{
 	"HYPER":     1.2, // Marin is excited, interactions feel more meaningful
 	"FLIRTY":    1.5, // Flirty mood = compliments and flirting worth more
-	"SLEEPY":    0.8, // Drowsy, less engaged
 	"BORED":     0.6, // Bored, harder to impress
 	"NOSTALGIC": 1.1, // Reflective, emotional connections worth more
 	"FOCUSED":   0.9, // Task-oriented, less emotional engagement

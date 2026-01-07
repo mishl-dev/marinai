@@ -3,7 +3,6 @@ package bot
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -214,18 +213,10 @@ func (h *Handler) HandleMessage(s Session, m *discordgo.MessageCreate) {
 
 // processAndReply handles the core logic of processing a message and sending a reply
 func (h *Handler) processAndReply(s Session, m *discordgo.MessageCreate, isMentioned, isDM bool, channel *discordgo.Channel) {
-	// Get current mood for affection multiplier and sleepy check
+	// Get current mood for affection multiplier
 	h.moodMu.RLock()
 	currentMoodForAffection := h.currentMood
 	h.moodMu.RUnlock()
-
-	// When sleepy, only 30% chance to respond (she's half-asleep)
-	if currentMoodForAffection == MoodSleepy {
-		if rand.Float64() > 0.30 {
-			// 70% chance to not respond when sleepy
-			return
-		}
-	}
 
 	// Update streak and set first interaction date
 	go func() {
