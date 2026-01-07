@@ -1,9 +1,66 @@
+# ============================================
+# MarinAI Configuration
+# ============================================
+
+# LLM Model Settings
+# Controls how the language model generates responses
 model_settings:
-  temperature: 1
-  top_p: 1
+  temperature: 1        # Creativity/randomness (0.0 = deterministic, 2.0 = very random)
+  top_p: 1              # Nucleus sampling threshold (1.0 = consider all tokens)
+
+# Response Delays
+# Timing controls for message processing
 delays:
-  message_processing: 1.5
+  message_processing: 1.5  # Seconds to wait before processing a message (anti-spam)
+
+# Memory System Settings
+# Controls how Marin remembers facts about users
 memory:
-  fact_aging_days: 7
-  fact_summarization_threshold: 20
-  maintenance_interval_hours: 24
+  fact_aging_days: 7              # Days before old facts are considered for cleanup
+  fact_summarization_threshold: 20  # Number of facts before triggering summarization
+  maintenance_interval_hours: 24  # Hours between memory maintenance runs
+
+# Typing Simulation Settings
+# Makes Marin appear more human-like when typing
+typing:
+  base_chars_per_second: 25.0  # Base typing speed (humans average ~40 WPM ≈ 3.3 CPS)
+  min_duration_ms: 800         # Minimum typing indicator duration in milliseconds
+  max_duration_ms: 4000        # Maximum typing indicator duration in milliseconds
+  variation: 0.3               # Random variation factor (0.3 = ±30% randomness)
+
+# Loneliness / Boredom DM Settings
+# Controls when Marin reaches out to inactive users
+loneliness:
+  inactivity_threshold_hours: 24  # Hours of user inactivity before eligible for DM
+  loneliness_threshold_hours: 4   # Hours of global bot inactivity before checking users
+  max_dm_attempts: 4              # Maximum DMs to send before giving up on a user
+  check_interval_minutes: 60      # Minutes between loneliness checks
+
+# Affection System Settings
+# Controls the relationship/XP progression system
+affection:
+  max_affection: 100000               # Maximum affection points (XP cap)
+  jealousy_threshold_days: 3          # Days of seeing user active elsewhere to trigger jealousy
+  jealousy_penalty: -100              # Daily affection loss when feeling jealous
+  random_event_chance: 0.05           # Chance of random affection events (0.05 = 5%)
+  late_night_start_hour: 23           # Hour when late night bonus starts (23 = 11 PM)
+  late_night_end_hour: 4              # Hour when late night bonus ends (4 = 4 AM)
+  max_streak_days: 30                 # Days to reach maximum streak multiplier (2x)
+  streak_break_penalty_per_day: 50    # XP lost per day of previous streak when broken
+  max_streak_break_penalty: 2500      # Maximum XP penalty for breaking a streak
+
+# Message Handling Settings
+# Controls how messages are processed and filtered
+messages:
+  max_message_length: 280       # Maximum message length to process (longer = ignored)
+  reply_score_threshold: 0.6    # Confidence score needed to auto-reply (0.0-1.0)
+  cleanup_interval_hours: 1     # Hours between old reminder cleanup runs
+
+# Storage / Database Settings
+# Controls memory caching and similarity detection
+storage:
+  recent_messages_limit: 60     # Maximum recent messages to fetch per user for context
+  recent_messages_keep: 30      # Number of messages to keep after cleanup runs
+  duplicate_threshold: 0.8      # Similarity score to consider a memory as duplicate (0.0-1.0)
+  similarity_threshold: 0.6     # Minimum similarity for memory search results (0.0-1.0)
+  cleanup_probability: 0.1      # Probability of running cleanup per message (0.1 = 10%)
