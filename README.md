@@ -34,20 +34,20 @@ Built with love using Go, Cerebras AI for ultra-fast inference, and SurrealDB fo
 - **Duplicate detection** — Smart deduplication prevents redundant memories
 
 ### 💕 Affection System
-A sophisticated relationship system inspired by dating sims with **100,000 XP** max progression and **10 relationship levels**:
+A sophisticated relationship system inspired by dating sims with **25,000 XP** max progression (~1 week casual) and **10 relationship levels**:
 
 | Level | XP Range | Description |
 |-------|----------|-------------|
-| 👋 Stranger | 0 - 4,999 | Just met |
-| 👀 Familiar Face | 5,000 - 9,999 | Seen around |
-| 🙂 Acquaintance | 10,000 - 19,999 | Starting to know you |
-| 😊 Casual Friend | 20,000 - 34,999 | Hang out sometimes |
-| 😄 Friend | 35,000 - 49,999 | Actual friends |
-| 🤗 Good Friend | 50,000 - 64,999 | Genuinely close |
-| 💕 Close Friend | 65,000 - 79,999 | Deep trust |
-| 💗 Best Friend | 80,000 - 89,999 | No barriers |
-| 💖 Soulmate | 90,000 - 97,499 | Deep connection |
-| ❤️‍🔥 Special Someone | 97,500 - 100,000 | In love |
+| 👋 Stranger | 0 - 1,249 | Just met |
+| 👀 Familiar Face | 1,250 - 2,499 | Seen around |
+| 🙂 Acquaintance | 2,500 - 4,999 | Starting to know you |
+| 😊 Casual Friend | 5,000 - 8,749 | Hang out sometimes |
+| 😄 Friend | 8,750 - 12,499 | Actual friends |
+| 🤗 Good Friend | 12,500 - 16,249 | Genuinely close |
+| 💕 Close Friend | 16,250 - 19,999 | Deep trust |
+| 💗 Best Friend | 20,000 - 22,499 | No barriers |
+| 💖 Soulmate | 22,500 - 24,374 | Deep connection |
+| ❤️‍🔥 Special Someone | 24,375 - 25,000 | In love |
 
 #### 🔥 Daily Streaks
 - Interact every day to build a streak (up to **2x XP bonus** at 30+ days!)

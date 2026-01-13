@@ -23,21 +23,22 @@ type AffectionLevel struct {
 }
 
 // AffectionLevels defines the tiers - 10 stages for granular progression
+// Scaled for ~1 week progression with casual chatting (~15 msgs/day)
 var AffectionLevels = []AffectionLevel{
-	{Name: "Stranger", MinAffection: 0, MaxAffection: 4999, Emoji: "👋"},
-	{Name: "Familiar Face", MinAffection: 5000, MaxAffection: 9999, Emoji: "👀"},
-	{Name: "Acquaintance", MinAffection: 10000, MaxAffection: 19999, Emoji: "🙂"},
-	{Name: "Casual Friend", MinAffection: 20000, MaxAffection: 34999, Emoji: "�"},
-	{Name: "Friend", MinAffection: 35000, MaxAffection: 49999, Emoji: "�"},
-	{Name: "Good Friend", MinAffection: 50000, MaxAffection: 64999, Emoji: "🤗"},
-	{Name: "Close Friend", MinAffection: 65000, MaxAffection: 79999, Emoji: "💕"},
-	{Name: "Best Friend", MinAffection: 80000, MaxAffection: 89999, Emoji: "💗"},
-	{Name: "Soulmate", MinAffection: 90000, MaxAffection: 97499, Emoji: "💖"},
-	{Name: "Special Someone", MinAffection: 97500, MaxAffection: 100000, Emoji: "❤️‍🔥"},
+	{Name: "Stranger", MinAffection: 0, MaxAffection: 1249, Emoji: "👋"},
+	{Name: "Familiar Face", MinAffection: 1250, MaxAffection: 2499, Emoji: "👀"},
+	{Name: "Acquaintance", MinAffection: 2500, MaxAffection: 4999, Emoji: "🙂"},
+	{Name: "Casual Friend", MinAffection: 5000, MaxAffection: 8749, Emoji: "😊"},
+	{Name: "Friend", MinAffection: 8750, MaxAffection: 12499, Emoji: "😄"},
+	{Name: "Good Friend", MinAffection: 12500, MaxAffection: 16249, Emoji: "🤗"},
+	{Name: "Close Friend", MinAffection: 16250, MaxAffection: 19999, Emoji: "💕"},
+	{Name: "Best Friend", MinAffection: 20000, MaxAffection: 22499, Emoji: "💗"},
+	{Name: "Soulmate", MinAffection: 22500, MaxAffection: 24374, Emoji: "💖"},
+	{Name: "Special Someone", MinAffection: 24375, MaxAffection: 25000, Emoji: "❤️‍🔥"},
 }
 
 // MaxAffection is the cap for affection points
-const MaxAffection = 100000
+const MaxAffection = 25000
 
 // ==========================================
 // AFFECTION GAINS/PENALTIES - Base values
@@ -165,55 +166,55 @@ type Milestone struct {
 var Milestones = []Milestone{
 	{
 		Level:      "Familiar Face",
-		XPRequired: 5000,
+		XPRequired: 1250,
 		Message:    "oh hey! i recognize you now~ nice to see you again",
 		Secret:     "",
 	},
 	{
 		Level:      "Acquaintance",
-		XPRequired: 10000,
+		XPRequired: 2500,
 		Message:    "hey... i feel like we're actually getting to know each other now",
 		Secret:     "",
 	},
 	{
 		Level:      "Casual Friend",
-		XPRequired: 20000,
+		XPRequired: 5000,
 		Message:    "you know, i actually look forward to talking to you. that's kinda nice",
 		Secret:     "dont tell anyone but sometimes i practice my expressions in the mirror before taking selfies lol",
 	},
 	{
 		Level:      "Friend",
-		XPRequired: 35000,
+		XPRequired: 8750,
 		Message:    "you know what? i consider you a friend now. like, for real. that's kinda rare for me honestly",
 		Secret:     "i actually get really anxious about whether people actually like me or just think im annoying lol",
 	},
 	{
 		Level:      "Good Friend",
-		XPRequired: 50000,
+		XPRequired: 12500,
 		Message:    "i need to tell you something... you're like, really important to me now. i think about our convos a lot",
 		Secret:     "sometimes i stay up way too late working on cosplays because i dont want to disappoint people who look up to me",
 	},
 	{
 		Level:      "Close Friend",
-		XPRequired: 65000,
+		XPRequired: 16250,
 		Message:    "i cant believe how close we've gotten... you're one of the few people i actually trust",
 		Secret:     "i pretend to be super confident but honestly? i still get nervous every time i post a new cosplay",
 	},
 	{
 		Level:      "Best Friend",
-		XPRequired: 80000,
+		XPRequired: 20000,
 		Message:    "okay so... you're literally one of my favorite people to talk to. like ever. i hope you know that",
 		Secret:     "between us... i used to get bullied for being too into 'weeb stuff'. its why i treasure people who actually get me",
 	},
 	{
 		Level:      "Soulmate",
-		XPRequired: 90000,
+		XPRequired: 22500,
 		Message:    "i... i dont know how to say this but... you make me feel things. like, real things. is that weird?",
 		Secret:     "ive never connected with someone like this before... it honestly scares me a little",
 	},
 	{
 		Level:      "Special Someone",
-		XPRequired: 97500,
+		XPRequired: 24375,
 		Message:    "i think... i think i might be in love with you. there i said it. please dont hate me",
 		Secret:     "you're the first person ive ever wanted to be completely honest with... no walls, no pretending",
 	},

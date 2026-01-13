@@ -39,7 +39,7 @@ loneliness:
 # Affection System Settings
 # Controls the relationship/XP progression system
 affection:
-  max_affection: 100000               # Maximum affection points (XP cap)
+  max_affection: 25000                # Maximum affection points (XP cap) - ~1 week casual progression
   jealousy_threshold_days: 3          # Days of seeing user active elsewhere to trigger jealousy
   jealousy_penalty: -100              # Daily affection loss when feeling jealous
   random_event_chance: 0.05           # Chance of random affection events (0.05 = 5%)
