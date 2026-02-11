@@ -44,7 +44,6 @@ func handleResetCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Content: "Are you sure you want to reset your memory? This cannot be undone.",
-			Flags:   discordgo.MessageFlagsEphemeral,
 			Components: []discordgo.MessageComponent{
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
@@ -140,7 +139,6 @@ func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: "Hmm, I had trouble checking my notes... Try again?",
-				Flags:   discordgo.MessageFlagsEphemeral,
 			},
 		})
 		return
@@ -207,7 +205,6 @@ func handleStatsCommand(h *Handler, s *discordgo.Session, i *discordgo.Interacti
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Embeds: []*discordgo.MessageEmbed{embed},
-			Flags:  discordgo.MessageFlagsEphemeral,
 		},
 	})
 
@@ -266,7 +263,6 @@ func handleMoodCommand(h *Handler, s *discordgo.Session, i *discordgo.Interactio
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Embeds: []*discordgo.MessageEmbed{embed},
-			Flags:  discordgo.MessageFlagsEphemeral,
 			Components: []discordgo.MessageComponent{
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
@@ -387,7 +383,6 @@ func handleAffectionCommand(h *Handler, s *discordgo.Session, i *discordgo.Inter
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Embeds: []*discordgo.MessageEmbed{embed},
-			Flags:  discordgo.MessageFlagsEphemeral,
 			Components: []discordgo.MessageComponent{
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
