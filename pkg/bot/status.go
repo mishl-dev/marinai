@@ -106,7 +106,7 @@ func (h *Handler) runDailyRoutine() {
 					Emoji: discordgo.Emoji{Name: status.Emoji},
 				},
 			},
-			Status: "idle",
+			Status: "online",
 			AFK:    true,
 		})
 

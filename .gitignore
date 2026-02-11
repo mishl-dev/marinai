@@ -42,3 +42,6 @@ invoke.py
 !.benchmarks/questions.json
 .benchmarks/response_cache.json
 .benchmarks/battle_cache.json
+# future
+.supertonic/
+supertonic/
