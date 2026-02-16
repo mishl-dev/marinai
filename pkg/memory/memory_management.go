@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"marinai/pkg/cerebras"
 	"strings"
 	"time"
 )
@@ -86,7 +85,7 @@ func (s *SurrealStore) ArchiveFact(userID, factText string, embedding []float32)
 }
 
 // SummarizeFacts uses LLM to consolidate facts
-func (s *SurrealStore) SummarizeFacts(userID string, cerebrasClient CerebrasClient) ([]string, error) {
+func (s *SurrealStore) SummarizeFacts(userID string, llmClient LLMClient) ([]string, error) {
 	// Get all facts
 	factItems, err := s.GetFactsWithTimestamps(userID)
 	if err != nil {
@@ -123,12 +122,12 @@ Task: Consolidate these facts into approximately %d facts (50%% reduction). This
 
 Return ONLY a JSON array of strings with the consolidated facts. Example: ["fact 1", "fact 2", "fact 3"]`, len(factTexts), strings.Join(factTexts, "\n"), targetCount, targetCount)
 
-	messages := []cerebras.Message{
+	messages := []LLMMessage{
 		{Role: "system", Content: "You are a fact consolidation assistant. Output ONLY JSON."},
 		{Role: "user", Content: prompt},
 	}
 
-	resp, err := cerebrasClient.ChatCompletion(messages)
+	resp, err := llmClient.ChatCompletion(messages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get summarization from LLM: %w", err)
 	}
@@ -153,7 +152,7 @@ Return ONLY a JSON array of strings with the consolidated facts. Example: ["fact
 }
 
 // MaintainUserProfile performs aging and summarization on a user's profile
-func (s *SurrealStore) MaintainUserProfile(userID string, embeddingClient EmbeddingClient, cerebrasClient CerebrasClient, agingDays int, summarizationThreshold int) (archivedCount int, summarized bool, err error) {
+func (s *SurrealStore) MaintainUserProfile(userID string, embeddingClient EmbeddingClient, llmClient LLMClient, agingDays int, summarizationThreshold int) (archivedCount int, summarized bool, err error) {
 	// Get facts with timestamps
 	factItems, err := s.GetFactsWithTimestamps(userID)
 	if err != nil {
@@ -198,7 +197,7 @@ func (s *SurrealStore) MaintainUserProfile(userID string, embeddingClient Embedd
 	if len(currentFacts) > summarizationThreshold {
 		log.Printf("User %s has %d facts, triggering summarization (threshold: %d)", userID, len(currentFacts), summarizationThreshold)
 
-		summarizedFacts, err := s.SummarizeFacts(userID, cerebrasClient)
+		summarizedFacts, err := s.SummarizeFacts(userID, llmClient)
 		if err != nil {
 			return archivedCount, false, fmt.Errorf("failed to summarize facts: %w", err)
 		}

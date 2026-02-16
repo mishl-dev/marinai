@@ -3,7 +3,7 @@ package bot
 import (
 	"fmt"
 	"log"
-	"marinai/pkg/cerebras"
+	
 	"marinai/pkg/memory"
 	"math/rand"
 	"strings"
@@ -111,12 +111,12 @@ Output ONLY the brief topic summary, nothing else. Examples:
 - "joking about staying up late"
 - "them asking about my cosplay"`, userMessage, marinReply)
 
-	messages := []cerebras.Message{
+	messages := []memory.LLMMessage{
 		{Role: "system", Content: "You summarize conversations in 5-10 words. Output only the summary."},
 		{Role: "user", Content: prompt},
 	}
 
-	reply, err := h.cerebrasClient.ChatCompletion(messages)
+	reply, err := h.llmClient.ChatCompletion(messages)
 	if err != nil {
 		log.Printf("Error generating convo summary: %v", err)
 		return "general chat" // Fallback
@@ -282,12 +282,12 @@ Just output the message, nothing else.`,
 		thought.ConvoSummary,
 		thought.LastUserMsg, thought.LastMarinReply, statePrompt)
 
-	messages := []cerebras.Message{
+	messages := []memory.LLMMessage{
 		{Role: "system", Content: "You are Marin Kitagawa continuing a conversation hours later with a follow-up thought."},
 		{Role: "user", Content: prompt},
 	}
 
-	reply, err := h.cerebrasClient.ChatCompletion(messages)
+	reply, err := h.llmClient.ChatCompletion(messages)
 	if err != nil {
 		log.Printf("Error generating continuation: %v", err)
 		// Fall back to simple templates

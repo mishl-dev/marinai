@@ -1,7 +1,8 @@
 package bot
 
-import (
-	"marinai/pkg/cerebras"
+import(
+	"marinai/pkg/memory"
+	
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,10 +16,9 @@ func TestExtractMemories(t *testing.T) {
 	mockCerebras := &mockCerebrasClient{}
 	mockEmbedding := &mockEmbeddingClient{}
 	mockMemory := &mockMemoryStore{}
-	mockGemini := &MockGeminiClient{}
 
 	// Create handler
-	h := NewHandler(mockCerebras, mockEmbedding, mockGemini, mockMemory, HandlerConfig{
+	h := NewHandler(mockCerebras, mockEmbedding, mockMemory, HandlerConfig{
 		MessageProcessingDelay:     0,
 		FactAgingDays:              7,
 		FactSummarizationThreshold: 20,
@@ -112,7 +112,7 @@ func TestExtractMemories(t *testing.T) {
 			}
 
 			// Mock Cerebras to return the test case response
-			mockCerebras.ChatCompletionFunc = func(messages []cerebras.Message) (string, error) {
+			mockCerebras.ChatCompletionFunc = func(messages []memory.LLMMessage) (string, error) {
 				return tc.llmResponse, nil
 			}
 
@@ -151,9 +151,8 @@ func TestExtractMemories_ShortMessage(t *testing.T) {
 	mockMemory := &mockMemoryStore{}
 	// Mock other dependencies...
 	mockEmbedding := &mockEmbeddingClient{}
-	mockGemini := &MockGeminiClient{}
 
-	h := NewHandler(mockCerebras, mockEmbedding, mockGemini, mockMemory, HandlerConfig{
+	h := NewHandler(mockCerebras, mockEmbedding, mockMemory, HandlerConfig{
 		MessageProcessingDelay:     0,
 		FactAgingDays:              7,
 		FactSummarizationThreshold: 20,
@@ -162,7 +161,7 @@ func TestExtractMemories_ShortMessage(t *testing.T) {
 
 	// Spy
 	chatCompletionCalled := false
-	mockCerebras.ChatCompletionFunc = func(messages []cerebras.Message) (string, error) {
+	mockCerebras.ChatCompletionFunc = func(messages []memory.LLMMessage) (string, error) {
 		chatCompletionCalled = true
 		return `{"add": [], "remove": []}`, nil
 	}

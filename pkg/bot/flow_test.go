@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"marinai/pkg/cerebras"
 	"marinai/pkg/memory"
 
 	"github.com/bwmarrin/discordgo"
@@ -14,28 +13,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Mock Cerebras Client
+// Mock LLM Client
 type mockCerebrasClient struct {
-	ChatCompletionFunc func(messages []cerebras.Message) (string, error)
-	ClassifyFunc       func(text string, labels []string) (string, float64, error)
+	ChatCompletionFunc          func(messages []memory.LLMMessage) (string, error)
+	ChatCompletionWithToolsFunc func(messages []memory.LLMMessage, tools []Tool) (*ChatResult, error)
+	DescribeImageFromURLFunc    func(imageURL string) (*ImageDescription, error)
 }
 
-func (m *mockCerebrasClient) ChatCompletion(messages []cerebras.Message) (string, error) {
+func (m *mockCerebrasClient) ChatCompletion(messages []memory.LLMMessage) (string, error) {
 	if m.ChatCompletionFunc != nil {
 		return m.ChatCompletionFunc(messages)
 	}
 	return "Default mock response", nil
 }
 
-func (m *mockCerebrasClient) Classify(text string, labels []string) (string, float64, error) {
-	if m.ClassifyFunc != nil {
-		return m.ClassifyFunc(text, labels)
+func (m *mockCerebrasClient) ChatCompletionWithTools(messages []memory.LLMMessage, tools []Tool) (*ChatResult, error) {
+	if m.ChatCompletionWithToolsFunc != nil {
+		return m.ChatCompletionWithToolsFunc(messages, tools)
 	}
-	// Default: return first label with high confidence
-	if len(labels) > 0 {
-		return labels[0], 0.85, nil
+	return &ChatResult{Content: "Default mock response"}, nil
+}
+
+func (m *mockCerebrasClient) DescribeImageFromURL(imageURL string) (*ImageDescription, error) {
+	if m.DescribeImageFromURLFunc != nil {
+		return m.DescribeImageFromURLFunc(imageURL)
 	}
-	return "neutral", 0.5, nil
+	return &ImageDescription{Description: "Mock image description"}, nil
 }
 
 // Mock Embedding Client
@@ -367,8 +370,7 @@ func TestMessageFlow(t *testing.T) {
 	mockMemory := &mockMemoryStore{}
 	mockSession := &mockDiscordSession{}
 
-	mockGemini := &MockGeminiClient{}
-	handler := NewHandler(mockCerebras, mockEmbedding, mockGemini, mockMemory, HandlerConfig{
+	handler := NewHandler(mockCerebras, mockEmbedding, mockMemory, HandlerConfig{
 		MessageProcessingDelay:     0,
 		FactAgingDays:              7,
 		FactSummarizationThreshold: 20,
@@ -394,7 +396,7 @@ func TestMessageFlow(t *testing.T) {
 		return []memory.RecentMessageItem{{Role: "user", Text: "rolling context"}}, nil
 	}
 
-	mockCerebras.ChatCompletionFunc = func(messages []cerebras.Message) (string, error) {
+	mockCerebras.ChatCompletionFunc = func(messages []memory.LLMMessage) (string, error) {
 		var promptBuilder strings.Builder
 		isMemoryEvaluation := false
 		isSentimentAnalysis := false

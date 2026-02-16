@@ -2,10 +2,9 @@ package bot
 
 import (
 	"github.com/bwmarrin/discordgo"
-	"marinai/pkg/cerebras"
+	"marinai/pkg/memory"
 )
 
-// Session interface abstracts discordgo.Session for testing
 type Session interface {
 	ChannelMessageSend(channelID string, content string, options ...discordgo.RequestOption) (*discordgo.Message, error)
 	ChannelMessageSendReply(channelID string, content string, reference *discordgo.MessageReference, options ...discordgo.RequestOption) (*discordgo.Message, error)
@@ -19,7 +18,6 @@ type Session interface {
 	UpdateStatusComplex(usd discordgo.UpdateStatusData) error
 }
 
-// DiscordSession adapts discordgo.Session to the Session interface
 type DiscordSession struct {
 	*discordgo.Session
 }
@@ -48,23 +46,47 @@ func (s *DiscordSession) UpdateStatusComplex(usd discordgo.UpdateStatusData) err
 	return s.Session.UpdateStatusComplex(usd)
 }
 
-type CerebrasClient interface {
-	ChatCompletion(messages []cerebras.Message) (string, error)
-	Classify(text string, labels []string) (string, float64, error)
+// LLMClient interface for all LLM operations
+type LLMClient interface {
+	ChatCompletion(messages []memory.LLMMessage) (string, error)
+	ChatCompletionWithTools(messages []memory.LLMMessage, tools []Tool) (*ChatResult, error)
+	DescribeImageFromURL(imageURL string) (*ImageDescription, error)
+}
+
+type Tool struct {
+	Type     string
+	Function ToolFunction
+}
+
+type ToolFunction struct {
+	Name        string
+	Description string
+	Parameters  map[string]interface{}
+}
+
+type ToolCall struct {
+	ID        string
+	Name      string
+	Arguments string
+}
+
+type ChatResult struct {
+	Content          string
+	ReasoningContent string
+	ToolCalls        []ToolCall
+	Usage            Usage
+}
+
+type Usage struct {
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
 }
 
 type EmbeddingClient interface {
 	Embed(text string) ([]float32, error)
 }
 
-// GeminiClient interface for Gemini API (vision + classification)
-type GeminiClient interface {
-	DescribeImageFromURL(imageURL string) (*ImageDescription, error)
-	Classify(text string, labels []string) (string, float64, error)
-}
-
-// ImageDescription represents the result of analyzing an image
-// This mirrors gemini.ImageDescription for interface compatibility
 type ImageDescription struct {
 	Description string
 	IsNSFW      bool

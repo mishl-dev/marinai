@@ -1,11 +1,12 @@
 package bot
 
-import (
+import(
+	
 	"os"
 	"testing"
 	"time"
 
-	"marinai/pkg/cerebras"
+	
 	"marinai/pkg/embedding"
 	"marinai/pkg/memory"
 
@@ -95,24 +96,21 @@ func TestHandler_Flow(t *testing.T) {
 	}
 
 	// Setup Dependencies
-	cerebrasKey := os.Getenv("CEREBRAS_API_KEY")
+	nvidiaKey := os.Getenv("NVIDIA_API_KEY")
 	embeddingKey := os.Getenv("EMBEDDING_API_KEY")
 	embeddingURL := os.Getenv("EMBEDDING_API_URL")
 	if embeddingURL == "" {
 		embeddingURL = "https://vector.mishl.dev/embed"
 	}
 
-	if cerebrasKey == "" || embeddingKey == "" {
+	if nvidiaKey == "" || embeddingKey == "" {
 		t.Skip("Skipping flow test: Missing API keys")
 	}
 
-	cerebrasClient := cerebras.NewClient(cerebrasKey, 0.7, 0.9, nil)
+	llmClient := &mockCerebrasClient{}
 	embeddingClient := embedding.NewClient(embeddingKey, embeddingURL)
 
 	// Override prioritized models for testing to avoid excessive retries
-	cerebras.PrioritizedModels = []cerebras.ModelConfig{
-		{ID: "llama-3.3-70b", MaxCtx: 65536},
-	}
 
 	// Use a temp dir for memory
 	tmpDir, err := os.MkdirTemp("", "marinai_flow_test")
@@ -128,8 +126,7 @@ func TestHandler_Flow(t *testing.T) {
 	}
 
 	// Initialize Handler
-	mockGemini := &MockGeminiClient{}
-	handler := NewHandler(cerebrasClient, embeddingClient, mockGemini, memoryStore, HandlerConfig{
+	handler := NewHandler(llmClient, embeddingClient, memoryStore, HandlerConfig{
 		MessageProcessingDelay:     0,
 		FactAgingDays:              7,
 		FactSummarizationThreshold: 20,
@@ -197,24 +194,21 @@ func TestHandler_FlowStructure(t *testing.T) {
 		t.Log("Warning: Error loading .env file")
 	}
 
-	cerebrasKey := os.Getenv("CEREBRAS_API_KEY")
+	nvidiaKey := os.Getenv("NVIDIA_API_KEY")
 	embeddingKey := os.Getenv("EMBEDDING_API_KEY")
 	embeddingURL := os.Getenv("EMBEDDING_API_URL")
 	if embeddingURL == "" {
 		embeddingURL = "https://vector.mishl.dev/embed"
 	}
 
-	if cerebrasKey == "" || embeddingKey == "" {
+	if nvidiaKey == "" || embeddingKey == "" {
 		t.Skip("Skipping structure test: Missing API keys")
 	}
 
-	cerebrasClient := cerebras.NewClient(cerebrasKey, 0.7, 0.9, nil)
+	llmClient := &mockCerebrasClient{}
 	embeddingClient := embedding.NewClient(embeddingKey, embeddingURL)
 
 	// Override prioritized models for testing
-	cerebras.PrioritizedModels = []cerebras.ModelConfig{
-		{ID: "llama-3.3-70b", MaxCtx: 65536},
-	}
 
 	tmpDir, err := os.MkdirTemp("", "marinai_structure_test")
 	require.NoError(t, err)
@@ -234,8 +228,7 @@ func TestHandler_FlowStructure(t *testing.T) {
 	memoryStore.AddRecentMessage("test_user_structure", "user", "How was your day?")
 	memoryStore.AddRecentMessage("test_user_structure", "assistant", "It was fine, I guess.")
 
-	mockGemini := &MockGeminiClient{}
-	handler := NewHandler(cerebrasClient, embeddingClient, mockGemini, memoryStore, HandlerConfig{
+	handler := NewHandler(llmClient, embeddingClient, memoryStore, HandlerConfig{
 		MessageProcessingDelay:     0,
 		FactAgingDays:              7,
 		FactSummarizationThreshold: 20,
@@ -307,32 +300,28 @@ func TestHandler_DMBehavior(t *testing.T) {
 		t.Log("Warning: Error loading .env file")
 	}
 
-	cerebrasKey := os.Getenv("CEREBRAS_API_KEY")
+	nvidiaKey := os.Getenv("NVIDIA_API_KEY")
 	embeddingKey := os.Getenv("EMBEDDING_API_KEY")
 	embeddingURL := os.Getenv("EMBEDDING_API_URL")
 	if embeddingURL == "" {
 		embeddingURL = "https://vector.mishl.dev/embed"
 	}
 
-	if cerebrasKey == "" || embeddingKey == "" {
+	if nvidiaKey == "" || embeddingKey == "" {
 		t.Skip("Skipping DM behavior test: Missing API keys")
 	}
 
-	cerebrasClient := cerebras.NewClient(cerebrasKey, 0.7, 0.9, nil)
+	llmClient := &mockCerebrasClient{}
 	embeddingClient := embedding.NewClient(embeddingKey, embeddingURL)
 
 	// Override prioritized models for testing
-	cerebras.PrioritizedModels = []cerebras.ModelConfig{
-		{ID: "llama3.1-8b", MaxCtx: 65536},
-	}
 
 	tmpDir, err := os.MkdirTemp("", "marinai_dm_test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 	memoryStore := memory.NewFileStore(tmpDir)
 
-	mockGemini := &MockGeminiClient{}
-	handler := NewHandler(cerebrasClient, embeddingClient, mockGemini, memoryStore, HandlerConfig{
+	handler := NewHandler(llmClient, embeddingClient, memoryStore, HandlerConfig{
 		MessageProcessingDelay:     0,
 		FactAgingDays:              7,
 		FactSummarizationThreshold: 20,

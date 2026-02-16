@@ -3,7 +3,7 @@ package bot
 import (
 	"fmt"
 	"log"
-	"marinai/pkg/cerebras"
+	
 	"marinai/pkg/memory"
 	"time"
 )
@@ -72,12 +72,12 @@ func (h *Handler) processReminder(r memory.Reminder) error {
 	- Don't say "I just remembered" or "You have an event".
 	- Just act like a friend checking in or reminding them.`, userName, r.Text)
 
-	messages := []cerebras.Message{
+	messages := []memory.LLMMessage{
 		{Role: "system", Content: "You are Marin Kitagawa."},
 		{Role: "user", Content: prompt},
 	}
 
-	reply, err := h.cerebrasClient.ChatCompletion(messages)
+	reply, err := h.llmClient.ChatCompletion(messages)
 	if err != nil {
 		return fmt.Errorf("error generating message: %w", err)
 	}

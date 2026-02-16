@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"log"
 	"math/rand"
 )
 
@@ -91,61 +90,44 @@ func pickRandomEmoji(emojis []string) string {
 	return emojis[rand.Intn(len(emojis))]
 }
 
+func getAllCategories() []ReactionCategory {
+	return ReactionCategories
+}
+
 func (h *Handler) evaluateReaction(s Session, channelID, messageID, content string) {
-	// Simple heuristic: if the message is too short, ignore
 	if len(content) < 5 {
 		return
 	}
 
-	labels := buildLabelsForClassification()
+	h.moodMu.RLock()
+	mood := h.currentMood
+	h.moodMu.RUnlock()
 
-	label, score, err := h.cerebrasClient.Classify(content, labels)
-	if err != nil {
+	reactionChance := 0.15
+
+	switch mood {
+	case MoodHyper:
+		reactionChance = 0.30
+	case MoodBored:
+		reactionChance = 0.25
+	case MoodFlirty:
+		reactionChance = 0.20
+	}
+
+	if rand.Float64() > reactionChance {
 		return
 	}
 
-	// Only react if confidence is reasonably high
-	if score < 0.75 {
+	categories := getAllCategories()
+	if len(categories) == 0 {
 		return
 	}
 
-	// Check if it's a neutral/boring message
-	if label == "neutral, boring, question, statement, generic" {
-		return
-	}
-
-	// Find the category and pick an emoji
-	category := findCategoryForLabel(label)
-	if category == nil {
-		return
-	}
-
+	category := categories[rand.Intn(len(categories))]
 	emoji := pickRandomEmoji(category.Emojis)
 	if emoji == "" {
 		return
 	}
 
-	// Mood-based reaction probability adjustment
-	h.moodMu.RLock()
-	mood := h.currentMood
-	h.moodMu.RUnlock()
-
-	reactionChance := 0.4 // Default 40% chance
-
-	switch mood {
-	case MoodHyper:
-		reactionChance = 0.7 // More reactive when hyper
-	case MoodBored:
-		reactionChance = 0.5 // Slightly more reactive when bored (something to do)
-	case MoodFlirty:
-		reactionChance = 0.6 // More reactive when flirty
-	case MoodFocused:
-		reactionChance = 0.25 // Less reactive when focused
-	}
-
-	if rand.Float64() < reactionChance {
-		if err := s.MessageReactionAdd(channelID, messageID, emoji); err != nil {
-			log.Printf("Error adding reaction: %v", err)
-		}
-	}
+	s.MessageReactionAdd(channelID, messageID, emoji)
 }

@@ -26,21 +26,21 @@ type Config struct {
 		Variation          float64 `yaml:"variation"`
 	} `yaml:"typing"`
 	LonelinessSettings struct {
-		InactivityThresholdHours  float64 `yaml:"inactivity_threshold_hours"`
-		LonelinessThresholdHours  float64 `yaml:"loneliness_threshold_hours"`
-		MaxDMAttempts             int     `yaml:"max_dm_attempts"`
-		CheckIntervalMinutes      int     `yaml:"check_interval_minutes"`
+		InactivityThresholdHours float64 `yaml:"inactivity_threshold_hours"`
+		LonelinessThresholdHours float64 `yaml:"loneliness_threshold_hours"`
+		MaxDMAttempts            int     `yaml:"max_dm_attempts"`
+		CheckIntervalMinutes     int     `yaml:"check_interval_minutes"`
 	} `yaml:"loneliness"`
 	AffectionSettings struct {
-		MaxAffection        int     `yaml:"max_affection"`
-		JealousyThreshold   int     `yaml:"jealousy_threshold_days"`
-		JealousyPenalty     int     `yaml:"jealousy_penalty"`
-		RandomEventChance   float64 `yaml:"random_event_chance"`
-		LateNightStartHour  int     `yaml:"late_night_start_hour"`
-		LateNightEndHour    int     `yaml:"late_night_end_hour"`
-		MaxStreakDays       int     `yaml:"max_streak_days"`
-		StreakBreakPenaltyPerDay int `yaml:"streak_break_penalty_per_day"`
-		MaxStreakBreakPenalty    int `yaml:"max_streak_break_penalty"`
+		MaxAffection             int     `yaml:"max_affection"`
+		JealousyThreshold        int     `yaml:"jealousy_threshold_days"`
+		JealousyPenalty          int     `yaml:"jealousy_penalty"`
+		RandomEventChance        float64 `yaml:"random_event_chance"`
+		LateNightStartHour       int     `yaml:"late_night_start_hour"`
+		LateNightEndHour         int     `yaml:"late_night_end_hour"`
+		MaxStreakDays            int     `yaml:"max_streak_days"`
+		StreakBreakPenaltyPerDay int     `yaml:"streak_break_penalty_per_day"`
+		MaxStreakBreakPenalty    int     `yaml:"max_streak_break_penalty"`
 	} `yaml:"affection"`
 	MessageSettings struct {
 		MaxMessageLength     int     `yaml:"max_message_length"`
@@ -48,12 +48,42 @@ type Config struct {
 		CleanupIntervalHours int     `yaml:"cleanup_interval_hours"`
 	} `yaml:"messages"`
 	StorageSettings struct {
-		RecentMessagesLimit     int     `yaml:"recent_messages_limit"`
-		RecentMessagesKeep      int     `yaml:"recent_messages_keep"`
-		DuplicateThreshold      float64 `yaml:"duplicate_threshold"`
-		SimilarityThreshold     float64 `yaml:"similarity_threshold"`
-		CleanupProbability      float64 `yaml:"cleanup_probability"`
+		RecentMessagesLimit int     `yaml:"recent_messages_limit"`
+		RecentMessagesKeep  int     `yaml:"recent_messages_keep"`
+		DuplicateThreshold  float64 `yaml:"duplicate_threshold"`
+		SimilarityThreshold float64 `yaml:"similarity_threshold"`
+		CleanupProbability  float64 `yaml:"cleanup_probability"`
 	} `yaml:"storage"`
+	Tools struct {
+		WebSearch struct {
+			Enabled    bool   `yaml:"enabled"`
+			Backend    string `yaml:"backend"`
+			MaxResults int    `yaml:"max_results"`
+			Timeout    int    `yaml:"timeout_seconds"`
+		} `yaml:"web_search"`
+		WebScrape struct {
+			Enabled     bool  `yaml:"enabled"`
+			MaxBodySize int64 `yaml:"max_body_bytes"`
+			Timeout     int   `yaml:"timeout_seconds"`
+		} `yaml:"web_scrape"`
+		Media struct {
+			Enabled bool `yaml:"enabled"`
+			Image   struct {
+				CompressionThreshold int64 `yaml:"compression_threshold"`
+				Quality              int   `yaml:"quality"`
+				MaxWidth             int   `yaml:"max_width"`
+				MaxHeight            int   `yaml:"max_height"`
+			} `yaml:"image"`
+			Audio struct {
+				DockerImage   string `yaml:"docker_image"`
+				Language      string `yaml:"language"`
+				MemoryLimitMB int    `yaml:"memory_limit_mb"`
+			} `yaml:"audio"`
+			PDF struct {
+				MaxPages int `yaml:"max_pages"`
+			} `yaml:"pdf"`
+		} `yaml:"media"`
+	} `yaml:"tools"`
 }
 
 func LoadConfig(path string) (*Config, error) {

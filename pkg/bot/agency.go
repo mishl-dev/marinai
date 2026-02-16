@@ -1,10 +1,11 @@
 package bot
 
-import (
+import(
+	"marinai/pkg/memory"
 	"encoding/json"
 	"fmt"
 	"log"
-	"marinai/pkg/cerebras"
+	
 	"math/rand"
 	"strings"
 	"time"
@@ -390,12 +391,12 @@ Write a spontaneous message (1 sentence). It must feel like you just randomly th
 
 Just output the message text.`, h.GetStateForPrompt(), level.Name, profileText)
 
-	messages := []cerebras.Message{
+	messages := []memory.LLMMessage{
 		{Role: "system", Content: "You are Marin Kitagawa sending a spontaneous message to a close friend."},
 		{Role: "user", Content: prompt},
 	}
 
-	reply, err := h.cerebrasClient.ChatCompletion(messages)
+	reply, err := h.llmClient.ChatCompletion(messages)
 	if err != nil {
 		// Fall back to template
 		return ProactiveThoughtMessages[rand.Intn(len(ProactiveThoughtMessages))]

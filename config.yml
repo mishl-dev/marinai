@@ -64,3 +64,37 @@ storage:
   duplicate_threshold: 0.8      # Similarity score to consider a memory as duplicate (0.0-1.0)
   similarity_threshold: 0.6     # Minimum similarity for memory search results (0.0-1.0)
   cleanup_probability: 0.1      # Probability of running cleanup per message (0.1 = 10%)
+
+# Tools Configuration
+# Controls how Marin uses external tools
+tools:
+  enabled:
+    - web_search
+    - web_scrape
+    - youtube_transcript
+    - pdf_extract
+    - image_compress
+    - audio_transcribe
+    
+  web_search:
+    backend: duckduckgo
+    max_results: 10
+    timeout_seconds: 30
+    
+  web_scrape:
+    max_body_bytes: 52428800    # 50MB
+    timeout_seconds: 30
+    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    
+  media:
+    image:
+      compression_threshold: 1048576  # 1MB
+      quality: 75
+      max_width: 1920
+      max_height: 1080
+    audio:
+      docker_image: "ghcr.io/ggerganov/whisper.cpp:main"
+      language: en
+      memory_limit_mb: 2048
+    pdf:
+      max_pages: 100

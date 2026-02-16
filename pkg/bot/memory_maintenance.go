@@ -33,7 +33,7 @@ func (h *Handler) maintainMemories() {
 				archivedCount, summarized, err := surrealStore.MaintainUserProfile(
 					userID,
 					h.embeddingClient,
-					h.cerebrasClient,
+					h.llmClient,
 					h.factAgingDays,
 					h.factSummarizationThreshold,
 				)

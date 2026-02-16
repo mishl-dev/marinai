@@ -1,9 +1,10 @@
 package bot
 
-import (
+import(
+	"marinai/pkg/memory"
 	"fmt"
 	"log"
-	"marinai/pkg/cerebras"
+	
 	"strings"
 	"time"
 )
@@ -206,12 +207,12 @@ Write a spontaneous message to start a conversation. Your tone must match your r
 
 Just output the message text.`, userName, relationshipInstruction, attemptContext, profileText, level.Name)
 
-	messages := []cerebras.Message{
+	messages := []memory.LLMMessage{
 		{Role: "system", Content: "You are Marin Kitagawa, a friendly cosplayer who texts like a real person. Be casual and natural. Adjust your tone based on how close you are to the person."},
 		{Role: "user", Content: prompt},
 	}
 
-	reply, err := h.cerebrasClient.ChatCompletion(messages)
+	reply, err := h.llmClient.ChatCompletion(messages)
 	if err != nil {
 		log.Printf("Error generating lonely message: %v", err)
 		return false

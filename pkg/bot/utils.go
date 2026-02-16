@@ -9,9 +9,9 @@ import (
 )
 
 func (h *Handler) sendSplitMessage(s Session, channelID, content string, reference *discordgo.MessageReference) {
-	// Replace \n\n with a special separator for multi-part messages
-	content = strings.ReplaceAll(content, "\n\n", "---SPLIT---")
-	parts := strings.Split(content, "---SPLIT---")
+	const maxLen = 2000
+
+	parts := splitMessage(content, maxLen)
 
 	isFirstPart := true
 	for _, part := range parts {
@@ -22,20 +22,17 @@ func (h *Handler) sendSplitMessage(s Session, channelID, content string, referen
 
 		var err error
 		if reference == nil {
-			// If there's no reference, send a normal message
 			_, err = s.ChannelMessageSend(channelID, part)
 		} else {
 			if isFirstPart {
-				// The first part of a reply pings the user by default
 				_, err = s.ChannelMessageSendReply(channelID, part, reference)
 				isFirstPart = false
 			} else {
-				// Subsequent parts are sent as replies without pinging the user
 				_, err = s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
 					Content:   part,
 					Reference: reference,
 					AllowedMentions: &discordgo.MessageAllowedMentions{
-						RepliedUser: false, // This prevents pinging on subsequent parts
+						RepliedUser: false,
 					},
 				})
 			}
@@ -44,10 +41,61 @@ func (h *Handler) sendSplitMessage(s Session, channelID, content string, referen
 		if err != nil {
 			log.Printf("Error sending message part: %v", err)
 		}
-
-		// Add a short delay between messages for a more natural feel
-		// time.Sleep(h.messageProcessingDelay) // REMOVED for performance
 	}
+}
+
+func splitMessage(content string, maxLen int) []string {
+	if len(content) <= maxLen {
+		return []string{content}
+	}
+
+	var parts []string
+	paragraphs := strings.Split(content, "\n\n")
+
+	for _, para := range paragraphs {
+		if len(para) <= maxLen {
+			parts = append(parts, para)
+			continue
+		}
+
+		lines := strings.Split(para, "\n")
+		for _, line := range lines {
+			if len(line) <= maxLen {
+				parts = append(parts, line)
+				continue
+			}
+
+			for len(line) > maxLen {
+				parts = append(parts, line[:maxLen])
+				line = line[maxLen:]
+			}
+			if line != "" {
+				parts = append(parts, line)
+			}
+		}
+	}
+
+	var merged []string
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		if len(merged) == 0 {
+			merged = append(merged, part)
+			continue
+		}
+
+		last := merged[len(merged)-1]
+		if len(last)+2+len(part) <= maxLen {
+			merged[len(merged)-1] = last + "\n\n" + part
+		} else {
+			merged = append(merged, part)
+		}
+	}
+
+	return merged
 }
 
 func (h *Handler) updateLastMessageTime(userID string) {

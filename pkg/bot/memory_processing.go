@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"marinai/pkg/cerebras"
+	
 	"marinai/pkg/memory"
 	"strings"
 	"time"
@@ -115,7 +115,7 @@ If they mention a specific future event with a timeframe, create a reminder with
 Output ONLY valid JSON.
 Example: {"add": ["Lives in Tokyo"], "remove": [], "reminders": []}`, currentProfile, currentTimeStr, userName, userMessage, botReply, exclusionList)
 
-	messages := []cerebras.Message{
+	messages := []memory.LLMMessage{
 		{
 			Role: "system",
 			Content: fmt.Sprintf(`
@@ -140,7 +140,7 @@ You are an extraction assistant for Marin Kitagawa. Identify and save important 
 	// ---------------------------------------------------------
 	// 4. Call LLM
 	// ---------------------------------------------------------
-	resp, err := h.cerebrasClient.ChatCompletion(messages)
+	resp, err := h.llmClient.ChatCompletion(messages)
 	if err != nil {
 		log.Printf("Error extracting memories: %v", err)
 		return

@@ -3,7 +3,6 @@ package memory
 import (
 	"encoding/json"
 	"fmt"
-	"marinai/pkg/cerebras"
 	"math"
 	"os"
 	"path/filepath"
@@ -23,9 +22,10 @@ type EmbeddingClient interface {
 	Embed(text string) ([]float32, error)
 }
 
-// CerebrasClient interface for LLM chat completions
-type CerebrasClient interface {
-	ChatCompletion(messages []cerebras.Message) (string, error)
+
+// LLMClient interface for LLM chat completions
+type LLMClient interface {
+	ChatCompletion(messages []LLMMessage) (string, error)
 }
 
 type RecentMessageItem struct {

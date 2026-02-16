@@ -1,9 +1,10 @@
 package bot
 
-import (
+import(
+	"marinai/pkg/memory"
 	"fmt"
 	"log"
-	"marinai/pkg/cerebras"
+	
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -69,12 +70,12 @@ EXCLUDE emojis related to:
 
 Return ONLY the emoji names that should be kept, separated by commas. If none are relevant, return "NONE".`, strings.Join(emojiNames, ", "))
 
-	messages := []cerebras.Message{
+	messages := []memory.LLMMessage{
 		{Role: "system", Content: "You are an emoji filter for a character AI."},
 		{Role: "user", Content: filterPrompt},
 	}
 
-	resp, err := h.cerebrasClient.ChatCompletion(messages)
+	resp, err := h.llmClient.ChatCompletion(messages)
 	if err != nil {
 		log.Printf("Error filtering emojis: %v", err)
 		// If filtering fails, return first 10 emojis as fallback

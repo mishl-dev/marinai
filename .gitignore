@@ -35,13 +35,10 @@ go.work.sum
 .jules/
 .Jules/
 .Jules
-prompts.*
-invoke.py
-# Vibes benchmark
-.benchmarks/*
-!.benchmarks/questions.json
-.benchmarks/response_cache.json
-.benchmarks/battle_cache.json
-# future
-.supertonic/
-supertonic/
+# Future
+
+reference_projects
+
+# Binary
+marinai
+marinai.exe

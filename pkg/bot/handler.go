@@ -1,24 +1,25 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
 
-	"marinai/pkg/cerebras"
 	"marinai/pkg/memory"
 
 	"github.com/bwmarrin/discordgo"
 )
 
 type Handler struct {
-	cerebrasClient         CerebrasClient
-	embeddingClient        EmbeddingClient
-	geminiClient           GeminiClient
+	llmClient       LLMClient
+	embeddingClient EmbeddingClient
+
 	memoryStore            memory.Store
-	taskAgent              *TaskAgent
+	toolExecutor           *ToolExecutor
 	botID                  string
 	wg                     sync.WaitGroup
 	lastMessageTimes       map[string]time.Time
@@ -52,13 +53,13 @@ type HandlerConfig struct {
 	MaintenanceIntervalHours   float64
 }
 
-func NewHandler(c CerebrasClient, e EmbeddingClient, g GeminiClient, m memory.Store, cfg HandlerConfig) *Handler {
+func NewHandler(c LLMClient, e EmbeddingClient, m memory.Store, cfg HandlerConfig) *Handler {
 	h := &Handler{
-		cerebrasClient:             c,
-		embeddingClient:            e,
-		geminiClient:               g,
+		llmClient:       c,
+		embeddingClient: e,
+
 		memoryStore:                m,
-		taskAgent:                  NewTaskAgent(c, g),
+		toolExecutor:               NewToolExecutor(nil),
 		lastMessageTimes:           make(map[string]time.Time),
 		messageProcessingDelay:     time.Duration(cfg.MessageProcessingDelay * float64(time.Second)),
 		processingUsers:            make(map[string]bool),
@@ -105,6 +106,10 @@ func (h *Handler) SetSession(s Session) {
 
 func (h *Handler) SetBotID(id string) {
 	h.botID = id
+}
+
+func (h *Handler) SetToolExecutor(executor *ToolExecutor) {
+	h.toolExecutor = executor
 }
 
 func (h *Handler) ResetMemory(userID string) error {
@@ -234,35 +239,22 @@ func (h *Handler) processAndReply(s Session, m *discordgo.MessageCreate, isMenti
 
 	s.ChannelTyping(m.ChannelID)
 
-	// Check if this is a long task request that should be refused
-	isTask, refusal := h.taskAgent.CheckTask(m.Content)
-	if isTask {
-		h.sendSplitMessage(s, m.ChannelID, refusal, m.Reference())
-
-		// Record the refusal in recent memory and calculate affection AFTER response
-		h.wg.Add(1)
-		go func() {
-			defer h.wg.Done()
-			h.addRecentMessage(m.Author.ID, "user", m.Content)
-			h.addRecentMessage(m.Author.ID, "assistant", refusal)
-
-			// Calculate affection based on full interaction (user message + Marin's response)
-			h.UpdateAffectionForInteraction(m.Author.ID, m.Content, refusal, isMentioned, isDM, false, currentMoodForAffection)
-		}()
-		return
-	}
-
 	// Parallelize data gathering to reduce latency
 	ctx := h.gatherMessageContext(s, m.Author.ID, m.Content, channel, m.Attachments)
 
 	messages := h.buildConversationMessages(displayName, m.Content, ctx)
 
 	// 6. Generate Reply
-	reply, err := h.cerebrasClient.ChatCompletion(messages)
+	reply, err := h.llmClient.ChatCompletion(messages)
 	if err != nil {
 		log.Printf("Error getting completion: %v", err)
 		h.sendSplitMessage(s, m.ChannelID, "(I'm having a headache... try again later.)", m.Reference())
 		return
+	}
+
+	reply, err = h.handleToolCalls(reply)
+	if err != nil {
+		log.Printf("Error handling tool calls: %v", err)
 	}
 
 	h.sendSplitMessage(s, m.ChannelID, reply, m.Reference())
@@ -308,32 +300,21 @@ func (h *Handler) processAndReply(s Session, m *discordgo.MessageCreate, isMenti
 	}()
 }
 
-// shouldReplyToMessage decides whether the bot should reply to a message
 func (h *Handler) shouldReplyToMessage(content string, isMentioned, isDM, isMarinChannel bool) bool {
-	// Always reply in DMs, dedicated channels, or when mentioned
 	if isMentioned || isDM || isMarinChannel {
 		return true
 	}
 
-	// Use Gemini to decide if Marin should respond based on her personality
-	labels := []string{
-		"message directly addressing Marin or Kitagawa",
-		"discussion about cosplay, anime, or games",
-		"discussion about fashion, makeup, or appearance",
-		"discussion about romance or relationships",
-		"someone sharing something they love (hobbies, interests)",
-		"casual conversation or blank message without mention of marin",
+	contentLower := strings.ToLower(content)
+
+	keywords := []string{"marin", "kitagawa", "cosplay", "anime", "game", "fashion", "cute"}
+	for _, kw := range keywords {
+		if strings.Contains(contentLower, kw) {
+			return true
+		}
 	}
 
-	label, score, err := h.cerebrasClient.Classify(content, labels)
-	if err != nil {
-		log.Printf("Error classifying message: %v", err)
-		return false
-	}
-
-	log.Printf("Reply Decision: '%s' (score: %.2f)", label, score)
-	// Reply if it matches her personality triggers (not casual conversation)
-	if label != "casual conversation or blank message without mention of marin" && score > 0.6 {
+	if rand.Float32() < 0.15 {
 		return true
 	}
 
@@ -341,7 +322,7 @@ func (h *Handler) shouldReplyToMessage(content string, isMentioned, isDM, isMari
 }
 
 // buildConversationMessages constructs the message history and system prompt for the LLM
-func (h *Handler) buildConversationMessages(displayName, userContent string, ctx MessageContext) []cerebras.Message {
+func (h *Handler) buildConversationMessages(displayName, userContent string, ctx MessageContext) []memory.LLMMessage {
 	// Prepare strings from gathered data
 	var retrievedMemories string
 	if len(ctx.Matches) > 0 {
@@ -390,26 +371,26 @@ func (h *Handler) buildConversationMessages(displayName, userContent string, ctx
 		systemPrompt = ctx.TimeContext + "\n\n" + systemPrompt
 	}
 
-	messages := []cerebras.Message{
+	messages := []memory.LLMMessage{
 		{Role: "system", Content: systemPrompt},
 	}
 
 	// Add comeback context if user is returning after boredom DMs
 	if ctx.ComebackContext != "" {
-		messages = append(messages, cerebras.Message{Role: "system", Content: ctx.ComebackContext})
+		messages = append(messages, memory.LLMMessage{Role: "system", Content: ctx.ComebackContext})
 		log.Printf("Comeback context: %s", ctx.ComebackContext)
 	}
 
 	log.Printf("Retrieved memories: %s", retrievedMemories)
 	if retrievedMemories != "" {
-		messages = append(messages, cerebras.Message{Role: "system", Content: retrievedMemories})
+		messages = append(messages, memory.LLMMessage{Role: "system", Content: retrievedMemories})
 	}
 	log.Printf("Rolling context: %s", rollingContext)
 	if rollingContext != "" {
-		messages = append(messages, cerebras.Message{Role: "system", Content: rollingContext})
+		messages = append(messages, memory.LLMMessage{Role: "system", Content: rollingContext})
 	}
 	if ctx.EmojiText != "" {
-		messages = append(messages, cerebras.Message{Role: "system", Content: ctx.EmojiText})
+		messages = append(messages, memory.LLMMessage{Role: "system", Content: ctx.EmojiText})
 	}
 
 	// Build user message with image context if present
@@ -423,7 +404,7 @@ func (h *Handler) buildConversationMessages(displayName, userContent string, ctx
 		log.Printf("Image context added: %s", ctx.ImageContext)
 	}
 
-	messages = append(messages, cerebras.Message{Role: "user", Content: userMessage})
+	messages = append(messages, memory.LLMMessage{Role: "user", Content: userMessage})
 
 	return messages
 }
@@ -439,4 +420,38 @@ func (h *Handler) cleanupLoop() {
 			log.Printf("Error cleaning up old reminders: %v", err)
 		}
 	}
+}
+
+func (h *Handler) handleToolCalls(response string) (string, error) {
+	if h.toolExecutor == nil || !h.toolExecutor.HasTools() {
+		return response, nil
+	}
+
+	toolCalls, err := ParseToolCallsFromResponse(response)
+	if err != nil || len(toolCalls) == 0 {
+		return response, nil
+	}
+
+	ctx := context.Background()
+	var results []ToolCallResult
+
+	for _, call := range toolCalls {
+		result, err := h.toolExecutor.ExecuteTool(ctx, call.Name, call.Params)
+		if err != nil {
+			log.Printf("Tool execution error for %s: %v", call.Name, err)
+			results = append(results, ToolCallResult{
+				Name:  call.Name,
+				Error: err.Error(),
+			})
+		} else {
+			results = append(results, ToolCallResult{
+				Name:    call.Name,
+				Success: result.Success,
+				Data:    result.Data,
+				Error:   result.Error,
+			})
+		}
+	}
+
+	return FormatToolResultsForLLM(response, results), nil
 }

@@ -20,7 +20,7 @@ var supportedImageTypes = map[string]bool{
 // processImageAttachments checks for image attachments and returns a description
 // Returns empty string if no images or gemini client not configured
 func (h *Handler) processImageAttachments(attachments []*discordgo.MessageAttachment) string {
-	if h.geminiClient == nil {
+	if h.llmClient == nil {
 		return ""
 	}
 
@@ -54,7 +54,7 @@ func (h *Handler) processImageAttachments(attachments []*discordgo.MessageAttach
 		log.Printf("Processing image: %s (%s, %d bytes)", attachment.Filename, attachment.ContentType, attachment.Size)
 
 		// Get image description from gemini client
-		result, err := h.geminiClient.DescribeImageFromURL(attachment.URL)
+		result, err := h.llmClient.DescribeImageFromURL(attachment.URL)
 		if err != nil {
 			log.Printf("Error processing image %s: %v", attachment.Filename, err)
 			continue

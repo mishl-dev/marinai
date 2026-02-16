@@ -1,10 +1,11 @@
 package bot
 
-import (
+import(
+	"marinai/pkg/memory"
 	"encoding/json"
 	"fmt"
 	"log"
-	"marinai/pkg/cerebras"
+	
 	"math/rand"
 	"strings"
 	"time"
@@ -653,7 +654,7 @@ IMPORTANT:
 
 Output ONLY valid JSON. Example: {"sentiment": "neutral"}`, userMessage, marinResponse)
 
-	messages := []cerebras.Message{
+	messages := []memory.LLMMessage{
 		{
 			Role:    "system",
 			Content: "You analyze conversation dynamics between a user and chatbot. Focus on how the interaction actually went, not just intent. Output ONLY valid JSON.",
@@ -664,7 +665,7 @@ Output ONLY valid JSON. Example: {"sentiment": "neutral"}`, userMessage, marinRe
 		},
 	}
 
-	resp, err := h.cerebrasClient.ChatCompletion(messages)
+	resp, err := h.llmClient.ChatCompletion(messages)
 	if err != nil {
 		return 0
 	}

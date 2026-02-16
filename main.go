@@ -3,12 +3,11 @@ package main
 import (
 	"log"
 	"marinai/pkg/bot"
-	"marinai/pkg/cerebras"
-
+	"marinai/pkg/cache"
 	"marinai/pkg/config"
 	"marinai/pkg/embedding"
-	"marinai/pkg/gemini"
 	"marinai/pkg/memory"
+	"marinai/pkg/nvidia"
 	"marinai/pkg/surreal"
 	"os"
 	"os/signal"
@@ -31,15 +30,15 @@ func main() {
 	}
 
 	token := os.Getenv("DISCORD_TOKEN")
-	cerebrasKey := os.Getenv("CEREBRAS_API_KEY")
+	nvidiaKey := os.Getenv("NVIDIA_API_KEY")
 	embeddingKey := os.Getenv("EMBEDDING_API_KEY")
 
 	// Check each required environment variable individually for better error messages
 	if token == "" {
 		log.Fatal("Missing required environment variable: DISCORD_TOKEN")
 	}
-	if cerebrasKey == "" {
-		log.Fatal("Missing required environment variable: CEREBRAS_API_KEY")
+	if nvidiaKey == "" {
+		log.Fatal("Missing required environment variable: NVIDIA_API_KEY")
 	}
 	if embeddingKey == "" {
 		log.Fatal("Missing required environment variable: EMBEDDING_API_KEY")
@@ -50,20 +49,12 @@ func main() {
 		embeddingURL = "https://vector.mishl.dev/embed"
 	}
 
-	// Initialize Clients
-	cerebrasClient := cerebras.NewClient(cerebrasKey, cfg.ModelSettings.Temperature, cfg.ModelSettings.TopP, nil)
+	// Initialize NVIDIA Client (handles chat, classification, and vision)
+	llmClient := nvidia.NewClient(nvidiaKey, cfg.ModelSettings.Temperature, cfg.ModelSettings.TopP, nil)
+	log.Println("NVIDIA client initialized (chat + vision)")
+
 	baseEmbeddingClient := embedding.NewClient(embeddingKey, embeddingURL)
 	embeddingClient := embedding.NewCachedClient(baseEmbeddingClient, 500) // Cache up to 500 embeddings
-
-	// Initialize Gemini Client - for image understanding and fast classification
-	var geminiClient bot.GeminiClient
-	geminiKey := os.Getenv("GEMINI_API_KEY")
-	if geminiKey != "" {
-		geminiClient = gemini.NewAdapter(geminiKey)
-		log.Println("Gemini client initialized (Flash Lite - vision + classification)")
-	} else {
-		log.Println("GEMINI_API_KEY not set, image understanding and fast classification disabled")
-	}
 
 	// Initialize Memory Store (SurrealDB)
 	surrealHost := os.Getenv("SURREAL_DB_HOST")
@@ -100,13 +91,63 @@ func main() {
 	}
 	defer surrealClient.Close()
 
-	memoryStore := memory.NewSurrealStore(surrealClient)
+	// Initialize Redis Cache
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "localhost:6379" // Default for local dev
+	}
+
+	redisCache, err := cache.NewRedisCache(redisURL, "marinai")
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	defer redisCache.Close()
+	log.Println("Redis cache connected")
+
+	if err := bot.InitSandbox(); err != nil {
+		log.Printf("Warning: Sandbox initialization failed: %v", err)
+	}
+
+	surrealStore := memory.NewSurrealStore(surrealClient)
+	memoryStore := memory.NewCachedStore(surrealStore, redisCache)
+
+	toolConfig := &bot.ToolConfig{
+		WebSearch: bot.WebSearchConfig{
+			Enabled:    cfg.Tools.WebSearch.Enabled,
+			Backend:    cfg.Tools.WebSearch.Backend,
+			MaxResults: cfg.Tools.WebSearch.MaxResults,
+			Timeout:    cfg.Tools.WebSearch.Timeout,
+		},
+		WebScrape: bot.WebScrapeConfig{
+			Enabled:     cfg.Tools.WebScrape.Enabled,
+			MaxBodySize: cfg.Tools.WebScrape.MaxBodySize,
+			Timeout:     cfg.Tools.WebScrape.Timeout,
+		},
+		Media: bot.MediaConfig{
+			Enabled: cfg.Tools.Media.Enabled,
+			Image: bot.ImageConfig{
+				CompressionThreshold: cfg.Tools.Media.Image.CompressionThreshold,
+				Quality:              cfg.Tools.Media.Image.Quality,
+				MaxWidth:             cfg.Tools.Media.Image.MaxWidth,
+				MaxHeight:            cfg.Tools.Media.Image.MaxHeight,
+			},
+			Audio: bot.AudioConfig{
+				DockerImage:   cfg.Tools.Media.Audio.DockerImage,
+				Language:      cfg.Tools.Media.Audio.Language,
+				MemoryLimitMB: cfg.Tools.Media.Audio.MemoryLimitMB,
+			},
+			PDF: bot.PDFConfig{
+				MaxPages: cfg.Tools.Media.PDF.MaxPages,
+			},
+		},
+	}
+	toolRegistry := bot.InitializeTools(toolConfig)
+	toolExecutor := bot.NewToolExecutor(toolRegistry)
 
 	// Initialize Bot Handler
 	handler := bot.NewHandler(
-		cerebrasClient,
+		llmClient,
 		embeddingClient,
-		geminiClient,
 		memoryStore,
 		bot.HandlerConfig{
 			MessageProcessingDelay:     cfg.Delays.MessageProcessing,
@@ -115,6 +156,7 @@ func main() {
 			MaintenanceIntervalHours:   cfg.MemorySettings.MaintenanceIntervalHours,
 		},
 	)
+	handler.SetToolExecutor(toolExecutor)
 
 	// Create Discord Session
 	dg, err := discordgo.New("Bot " + token)
@@ -125,53 +167,22 @@ func main() {
 	dg.Identify.Properties.Browser = "Discord Android"
 	dg.Identify.Properties.Device = "Discord Android" // Consistency
 
-	// Register Handlers
-	dg.AddHandler(handler.MessageCreate)
-	dg.AddHandler(handler.InteractionCreate)
+	// Register handlers
+	dg.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
+		handler.HandleMessage(&bot.DiscordSession{s}, m)
+	})
 
-	// Open Connection
-	if err := dg.Open(); err != nil {
-		log.Fatalf("Error opening connection: %v", err)
-	}
+	// Open connection
+	dg.Open()
+	defer dg.Close()
 
-	// Set Bot ID in handler (so it can ignore itself)
-	handler.SetBotID(dg.State.User.ID)
-	// Set Session in handler (for background tasks like loneliness check)
-	handler.SetSession(&bot.DiscordSession{Session: dg})
-
-	// Register slash commands (empty string = global, or specify guild ID for faster testing)
-	// For production, use "" for global commands. For development, use a specific guild ID for instant updates.
-	// Commands persist across restarts - Discord's API is idempotent for registration.
-	guildID := os.Getenv("DISCORD_GUILD_ID") // Optional: set this for faster command updates during development
-	if _, err := bot.RegisterSlashCommands(dg, guildID); err != nil {
-		log.Fatalf("Error registering slash commands: %v", err)
+	// Set bot ID so handler can ignore its own messages
+	if dg.State != nil && dg.State.User != nil {
+		handler.SetBotID(dg.State.User.ID)
 	}
 
 	log.Println("Marin is now running. Press CTRL-C to exit.")
-
-	// Set Custom Status
-	err = dg.UpdateStatusComplex(discordgo.UpdateStatusData{
-		Activities: []*discordgo.Activity{
-			{
-				Name:  "Custom Status",
-				Type:  discordgo.ActivityTypeCustom,
-				State: "working on my next cosplay! ✨",
-				Emoji: discordgo.Emoji{
-					Name: "🧵",
-				},
-			},
-		},
-		Status: "online",
-		AFK:    true,
-	})
-	if err != nil {
-		log.Printf("Error setting custom status: %v", err)
-	}
-
-	// Wait for signal
 	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM)
 	<-sc
-
-	dg.Close()
 }
